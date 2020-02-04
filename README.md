@@ -3,7 +3,7 @@ This repository is for the CableLabs Distributed Denial of Service Information S
 
 ## Environment Setup
 
-run bin/setup-
+run bin/setup-virtualenv
 
 ## Running the Arbor Monitor
 
