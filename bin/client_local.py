@@ -19,10 +19,9 @@ requests.packages.urllib3.disable_warnings()
 
 def read_file():
 
-    f = open("attack_payload_back","r")
+    f = open("attack_payload","r")
     data = f.read()
     f.close()
-
     #print(data)
     payload = json.loads(data)
     payload_data = payload["data"]
@@ -55,7 +54,8 @@ def read_file():
 def send_event(attack):
     post_url = "{}:{}{}{}&api_key={}".format(cfg.crits_api_url,cfg.crits_api_port,cfg.crits_api_path,cfg.crits_api_user,cfg.crits_api_token)
     print(post_url)
-    event = json.loads("{}".format(attack.output()))
+    #event = json.loads("{}".format(attack.output()))
+    event = json.loads(attack.output())
     r = requests.post(url=post_url,json=event)
     print (r.content) 
 

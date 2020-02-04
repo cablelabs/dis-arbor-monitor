@@ -36,13 +36,8 @@ class Attack:
             for ip in self.source_ips:
                 ingest_data_object = {}
                 ingest_data_object["IPaddress"]=ip
-                #format time for crits
-                if ":" == self.start_time[-3:-2]:
-                    self.start_time = self.start_time[:-3]+self.start_time[-2:]
-                if ":" == self.stop_time[-3:-2]:
-                    self.stop_time = self.stop_time[:-3]+self.stop_time[-2:]
-                ingest_data_object["attackStartTime"] = self.start_time+"Z"
-                ingest_data_object["attackStopTime"] = self.stop_time+"Z"
+                ingest_data_object["attackStartTime"] = self.start_time
+                ingest_data_object["attackStopTime"] = self.stop_time
                 ingest_data_object["attackTypes"] = self.misuse_types
                 ingest_data_object["peakBPS"] = self.peak_bps
                 ingest_data_object["peakPPS"] = self.peak_pps
@@ -56,5 +51,5 @@ class Attack:
         else:
             print("Error: Output format of {} is not correct".format(forma))
 
-        return json.dumps(post_object)
+        return json.dumps(post_object,indent=4)
 

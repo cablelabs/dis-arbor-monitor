@@ -7,7 +7,6 @@ from jsonschema import validate
 from attack import Attack
 from datetime import datetime
 
-
 import client_config as cfg 
 
 #disable Warning for SSL.
@@ -20,13 +19,14 @@ app = Quart(__name__)
 
 
 async def index():
+    """
+    This awaits data from Arbor and then parseses it into an attack object.
+    Once an attack has been finished ie ongong is False, then the code goes back out and queries for 
+    Source IPs and adds that to the attack object.
+
+    """
     data = await request.data
-    #decode byte array
-    f = open("attack_payload","ab")
-    f.write(data)
-    f.close()
-    data_string = data.decode("utf-8")
-    payload = json.loads(data_string)
+    payload = json.loads(data)
     payload_data = payload["data"]
     attack_attributes = payload_data["attributes"]
     print("PAYLOAD:{}".format(payload))
@@ -40,14 +40,8 @@ async def index():
     else:
         attack_id = payload_data["id"]
         attack = Attack(attack_id)
-        start_time = attack_attributes["start_time"]
-        #format time for crits
-        if ":" == start_time[-3:-2]:
-            start_time = start_time[:-3]+start_time[-2:]
-        attack.start_time = start_time
-        stop_time = attack_attributes["stop_time"]
-        if ":" == stop_time[-3:-2]:
-            stop_time = stop_time[:-3]+stop_time[-2:]
+        attack.start_time = attack_attributes["start_time"]
+        attack.stop_time = attack_attributes["stop_time"]
         attack.stop_time = attack_attributes["stop_time"]
         attack_subobjects = attack_attributes["subobject"]
         attack.peak_pps = attack_subobjects["impact_pps"]
@@ -56,17 +50,42 @@ async def index():
         attack.source_ips = get_source_ips(attack_id=attack.id)
         print("Attack ID:{} \n Finished".format(attack_id))
         print("JSON:{}".format(attack.output()))
+        if len(attack.source_ips):
+            send_event(attack)
+        else:
+            print("Empty Event")
 
     return 'hello'
 
 def send_event(attack):
+    """
+    Sends event to Crits Server.
+
+    Parameters:
+    attack object
+
+    Returns:
+    crits request response.
+
+    """
     post_url = "{}:{}{}{}&api_key={}".format(cfg.crits_api_url,cfg.crits_api_port,cfg.crits_api_path,cfg.crits_api_user,cfg.crits_api_token)
     print(post_url)
-    formatted_url=urllib.parse.quote(post_url)
-    r = requests.post(url=post_url,json=event)
+    event = json.loads(attack.output())
+    r = requests.post(url=post_url,json=event,headers={"Content-Type": "application/json"})
     print (r.content) 
 
-def get_source_ips(attack_id,impact_pps=None,impact_bps=None):
+def get_source_ips(attack_id):
+    """
+    Makes a request to Arbor instance for the source IP that match the Attack ID:
+
+    Parameters:
+    attack_id 
+
+    Returns:
+
+    Array of source IPs
+
+    """
     response = requests.get("https://lab-arbos01.cablelabs.com/api/sp/v6/alerts/{}/source_ip_addresses".format(attack_id),
             verify=False,headers={"X-Arbux-APIToken":cfg.arbor_token}) 
     json_response = response.json()
