@@ -94,7 +94,7 @@ def get_source_ips(attack_id):
     return source_ips
 
 
-app.run(debug=True,host='0.0.0.0',port=443,certfile='/etc/crits-client/combined.cer',keyfile='/etc/crits-client/private.key')
+app.run(debug=True,host='0.0.0.0',port=8443,certfile='/etc/crits-client/combined.cer',keyfile='/etc/crits-client/private.key')
 
 
 
