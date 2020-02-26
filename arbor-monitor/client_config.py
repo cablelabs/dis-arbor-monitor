@@ -1,3 +1,8 @@
+https_tls_certfile="/etc/crits-client/combined.cer"
+https_tls_keyfile="/etc/crits-client/private.key"
+https_bind_address="0.0.0.0"
+https_bind_port=8443
+arbor_api_prefix = "https://lab-arbos01.cablelabs.com"
 arbor_token = 'rYQYmVaovJGd4Mjp6Ntxxrj5BEmKOjYUbmzaL51K'
 provider = 'CableLabs'
 crits_api_url = "http://crits-test-lb-1683968455.us-east-2.elb.amazonaws.com"

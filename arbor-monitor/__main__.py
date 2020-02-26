@@ -1,27 +1,27 @@
 from quart import Quart,request
-import json
-import requests
-import sys 
-import jsonschema
-from jsonschema import validate
+import json, requests, logging
 from attack import Attack
-from datetime import datetime
 
-import client_config as cfg 
+import client_config as cfg
+
+logging_filename=None
+logging_filemode=None
+logging.basicConfig (level=logging.DEBUG, filename=logging_filename, filemode=logging_filemode,
+                     format='%(asctime)s %(name)s: %(levelname)s %(message)s')
+logger = logging.getLogger ('dis-arbor-monitor')
 
 #disable Warning for SSL.
 requests.packages.urllib3.disable_warnings()
 
 app = Quart(__name__)
 
+
 @app.route('/',methods=['POST'])
-
-
 
 async def index():
     """
     This awaits data from Arbor and then parseses it into an attack object.
-    Once an attack has been finished ie ongong is False, then the code goes back out and queries for 
+    Once an attack has been finished ie ongoing is False, then the code goes back out and queries for
     Source IPs and adds that to the attack object.
 
     """
@@ -29,16 +29,14 @@ async def index():
     payload = json.loads(data)
     payload_data = payload["data"]
     attack_attributes = payload_data["attributes"]
-    print("PAYLOAD:{}".format(payload))
+    attack_id = payload_data.get("id")
+    logger.debug("PAYLOAD:" + json.dumps(payload, indent=3))
 
     #check if ongoing
     if attack_attributes["ongoing"]:
-        try:
-            print("New/Ongoing Attack ID :{} \n Ongoing waiting".format(payload_data['id']))
-        except:
-            print(payload_data)
+        logger.info(f"Received notification of ONGOING attack (ID: {attack_id})")
     else:
-        attack_id = payload_data["id"]
+        logger.info(f"Received notification of COMPLETED attack (ID: {attack_id})")
         attack = Attack(attack_id)
         attack.start_time = attack_attributes["start_time"]
         attack.stop_time = attack_attributes["stop_time"]
@@ -48,12 +46,10 @@ async def index():
         attack.peak_bps = attack_subobjects["impact_bps"]
         attack.misuse_types = attack_subobjects["misuse_types"]
         attack.source_ips = get_source_ips(attack_id=attack.id)
-        print("Attack ID:{} \n Finished".format(attack_id))
-        print("JSON:{}".format(attack.output()))
         if len(attack.source_ips):
             send_event(attack)
         else:
-            print("Empty Event")
+            logger.warning(f"No source IPs found for attack {attack_id}")
 
     return 'hello'
 
@@ -68,11 +64,11 @@ def send_event(attack):
     crits request response.
 
     """
-    post_url = "{}:{}{}{}&api_key={}".format(cfg.crits_api_url,cfg.crits_api_port,cfg.crits_api_path,cfg.crits_api_user,cfg.crits_api_token)
-    print(post_url)
+    post_url = f"{cfg.crits_api_url}:{cfg.crits_api_port}{cfg.crits_api_path}{cfg.crits_api_user}&api_key={cfg.crits_api_token}"
+    logger.debug("POSTing to: " + post_url)
     event = json.loads(attack.output())
     r = requests.post(url=post_url,json=event,headers={"Content-Type": "application/json"})
-    print (r.content) 
+    logger.debug("POST response: " + r.text)
 
 def get_source_ips(attack_id):
     """
@@ -86,15 +82,17 @@ def get_source_ips(attack_id):
     Array of source IPs
 
     """
-    response = requests.get("https://lab-arbos01.cablelabs.com/api/sp/v6/alerts/{}/source_ip_addresses".format(attack_id),
-            verify=False,headers={"X-Arbux-APIToken":cfg.arbor_token}) 
+
+    response = requests.get(f"{cfg.arbor_api_prefix}/api/sp/v6/alerts/{attack_id}/source_ip_addresses",
+                            verify=False,headers={"X-Arbux-APIToken":cfg.arbor_token})
     json_response = response.json()
     source_ips = json_response['data']['attributes']['source_ips']
-    print ("Source IPS:{}".format(source_ips))
+    logger.debug(f"Found Source IPs for attack ID {attack_id}: {source_ips}")
     return source_ips
 
 
-app.run(debug=True,host='0.0.0.0',port=8443,certfile='/etc/crits-client/combined.cer',keyfile='/etc/crits-client/private.key')
+app.run(debug=True,host=cfg.https_bind_address,port=cfg.https_bind_port,
+        certfile=cfg.https_tls_certfile,keyfile=cfg.https_tls_keyfile)
 
 
 

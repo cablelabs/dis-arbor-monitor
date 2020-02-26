@@ -16,7 +16,6 @@ class Attack:
         self.source_port = source_port
         self.misuse_types = misuse_types #array
         self.source_ips = source_ips #array
-        print("peakBPS:{}".format(self.peak_bps))
 
     def output(self,format='crits'):
         """
@@ -49,7 +48,6 @@ class Attack:
                 ingest_data_array.append(ingest_data_object) 
             post_object['ingestData']=ingest_data_array
         else:
-            print("Error: Output format of {} is not correct".format(forma))
+            raise Exception(f"Output format {format} not supported")
 
         return json.dumps(post_object,indent=4)
-
