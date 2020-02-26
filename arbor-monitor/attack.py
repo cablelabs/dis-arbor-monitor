@@ -28,9 +28,9 @@ class Attack:
             attack: dictionary 
 
         """
-        post_object = {}
+        crits_object = {}
         if format == 'crits':
-            post_object["ProviderName"] = cfg.provider
+            crits_object["ProviderName"] = cfg.provider
             ingest_data_array = []
             for ip in self.source_ips:
                 ingest_data_object = {}
@@ -46,8 +46,8 @@ class Attack:
                 #ingest_data_object["totalBytesSent"] = self.total_bytes
                 #ingest_data_object["totalPacketsSent"] = self.total_packets
                 ingest_data_array.append(ingest_data_object) 
-            post_object['ingestData']=ingest_data_array
+            crits_object['ingestData']=ingest_data_array
         else:
             raise Exception(f"Output format {format} not supported")
 
-        return json.dumps(post_object,indent=4)
+        return crits_object

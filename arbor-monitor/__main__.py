@@ -20,7 +20,7 @@ app = Quart(__name__)
 
 async def index():
     """
-    This awaits data from Arbor and then parseses it into an attack object.
+    This awaits data from Arbor and then parses it into an attack object.
     Once an attack has been finished ie ongoing is False, then the code goes back out and queries for
     Source IPs and adds that to the attack object.
 
@@ -30,9 +30,8 @@ async def index():
     payload_data = payload["data"]
     attack_attributes = payload_data["attributes"]
     attack_id = payload_data.get("id")
-    logger.debug("PAYLOAD:" + json.dumps(payload, indent=3))
+    logger.debug("Arbor notification payload:" + json.dumps(payload, indent=3))
 
-    #check if ongoing
     if attack_attributes["ongoing"]:
         logger.info(f"Received notification of ONGOING attack (ID: {attack_id})")
     else:
@@ -47,27 +46,27 @@ async def index():
         attack.misuse_types = attack_subobjects["misuse_types"]
         attack.source_ips = get_source_ips(attack_id=attack.id)
         if len(attack.source_ips):
-            send_event(attack)
+            event_object = attack.output()
+            send_event(event_object, cfg.consumer_url)
         else:
             logger.warning(f"No source IPs found for attack {attack_id}")
 
     return 'hello'
 
-def send_event(attack):
+def send_event(event_object, post_url):
     """
-    Sends event to Crits Server.
+    Sends event to consumer URL.
 
     Parameters:
-    attack object
+    json data to post
 
     Returns:
-    crits request response.
+    POST request response.
 
     """
-    post_url = f"{cfg.crits_api_url}:{cfg.crits_api_port}{cfg.crits_api_path}{cfg.crits_api_user}&api_key={cfg.crits_api_token}"
-    logger.debug("POSTing to: " + post_url)
-    event = json.loads(attack.output())
-    r = requests.post(url=post_url,json=event,headers={"Content-Type": "application/json"})
+    logger.info(f"POSTing to {post_url}")
+    logger.debug(json.dumps(event_object, indent=3))
+    r = requests.post(url=post_url, json=event_object, headers={"Content-Type": "application/json"})
     logger.debug("POST response: " + r.text)
 
 def get_source_ips(attack_id):
@@ -91,9 +90,5 @@ def get_source_ips(attack_id):
     return source_ips
 
 
-app.run(debug=True,host=cfg.https_bind_address,port=cfg.https_bind_port,
+app.run(debug=cfg.quart_debug,host=cfg.https_bind_address,port=cfg.https_bind_port,
         certfile=cfg.https_tls_certfile,keyfile=cfg.https_tls_keyfile)
-
-
-
-
