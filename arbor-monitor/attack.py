@@ -1,11 +1,8 @@
-import client_config as cfg
-import json
-
 class Attack:
 
-
-    def __init__(self,id,start_time=None,stop_time=None,misuse_types=None,peak_bps=None,peak_pps=None,source_ips=None,protocol="UDP",source_port="1234",total_bytes=1,total_packets=1):
+    def __init__(self,id,provider_name, start_time=None,stop_time=None,misuse_types=None,peak_bps=None,peak_pps=None,source_ips=None,protocol="UDP",source_port="1234",total_bytes=1,total_packets=1):
         self.id = id
+        self.provider_name = provider_name
         self.start_time = start_time
         self.stop_time = stop_time
         self.peak_bps = peak_bps
@@ -30,7 +27,7 @@ class Attack:
         """
         crits_object = {}
         if format == 'crits':
-            crits_object["ProviderName"] = cfg.provider
+            crits_object["ProviderName"] = self.provider_name
             ingest_data_array = []
             for ip in self.source_ips:
                 ingest_data_object = {}
