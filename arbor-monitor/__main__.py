@@ -34,7 +34,7 @@ async def index():
         logger.info(f"Received notification of ONGOING attack (ID: {attack_id})")
     else:
         logger.info(f"Received notification of COMPLETED attack (ID: {attack_id})")
-        attack = Attack(attack_id, args.provider_name)
+        attack = Attack(attack_id, args.report_provider_name)
         attack.start_time = attack_attributes["start_time"]
         attack.stop_time = attack_attributes["stop_time"]
         attack.stop_time = attack_attributes["stop_time"]
@@ -45,7 +45,7 @@ async def index():
         attack.source_ips = get_source_ips(attack_id=attack.id)
         if len(attack.source_ips):
             event_object = attack.output()
-            send_event(event_object, args.consumer_url)
+            send_event(event_object, args.report_consumer_url)
         else:
             logger.warning(f"No source IPs found for attack {attack_id}")
 
@@ -116,30 +116,33 @@ arg_parser.add_argument ('--arbor-api-token', "-aat,", required=False, action='s
                          default = os.environ.get('DIS_ARBOR_MON_REST_API_TOKEN'),
                          help="Specify the Arbor API token to use for REST calls "
                               "(or DIS_ARBOR_MON_REST_API_TOKEN)")
-arg_parser.add_argument ('--provider-name', "-pn,", required=False, action='store', type=str,
-                         default = os.environ.get('DIS_ARBOR_MON_PROVIDER_NAME'),
-                         help="Specify the name of the data provider for the consumer reports "
-                              "(or DIS_ARBOR_MON_PROVIDER_NAME)")
-arg_parser.add_argument ('--consumer-url', "-cap,", required=False, action='store', type=str,
-                         default = os.environ.get('DIS_ARBOR_MON_CRITS_API_PREFIX'),
-                         help="Specifies the API prefix to use for reporting to CRITS "
-                              "(e.g. 'https://crits-report-server.acme.com:8080/api/v1/data_ingester_resource/?username=crituser&api_key=abcd') "
-                              "(or DIS_ARBOR_MON_CRITS_API_PREFIX)")
+arg_parser.add_argument ('--report-consumer-url', "-rcu,", required=False, action='store', type=str,
+                         default = os.environ.get('DIS_ARBOR_MON_REPORT_CONSUMER_URL'),
+                         help="Specifies the API prefix to use for posting the attack report"
+                              "(e.g. 'https://my-report-server.acme.com:8080/api/v1/data_ingester_resource/?username=crituser&api_key=abcd') "
+                              "(or DIS_ARBOR_MON_REPORT_CONSUMER_URL)")
+arg_parser.add_argument ('--report-provider-name', "-rpn,", required=False, action='store', type=str,
+                         default = os.environ.get('DIS_ARBOR_MON_REPORT_PROVIDER_NAME'),
+                         help="Specify the name of the data provider to include in the consumer reports "
+                              "(or DIS_ARBOR_MON_REPORT_PROVIDER_NAME)")
 arg_parser.add_argument ('--debug', "-d,", required=False, action='store_true',
                          default = os.environ.get('DIS_ARBOR_DEBUG') == "True",
                          help="Enables debugging output/checks")
 
 args = arg_parser.parse_args ()
 
+cert_chain_filename = args.cert_chain_file.name if args.cert_chain_file else None
+cert_key_filename = args.cert_key_file.name if args.cert_key_file else None
+
 logger.info(f"Bind address: {args.bind_address}")
 logger.info(f"Bind port: {args.bind_port}")
-logger.info(f"Cert chain file: {args.cert_chain_file.name}")
-logger.info(f"Cert key file: {args.cert_key_file.name}")
+logger.info(f"Cert chain file: {cert_chain_filename}")
+logger.info(f"Cert key file: {cert_key_filename}")
 logger.info(f"Arbor API prefix: {args.arbor_api_prefix}")
 logger.info(f"Arbor API token: {args.arbor_api_token}")
-logger.info(f"Provider name: {args.provider_name}")
-logger.info(f"Consumer URL: {args.consumer_url}")
+logger.info(f"Provider name: {args.report_provider_name}")
+logger.info(f"Consumer URL: {args.report_consumer_url}")
 logger.info(f"Debug: {args.debug}")
 
 app.run(debug=args.debug, host=args.bind_address, port=args.bind_port,
-        certfile=args.cert_chain_file.name, keyfile=args.cert_key_file.name)
+        certfile=cert_chain_filename, keyfile=cert_key_filename)
