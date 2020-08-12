@@ -6,6 +6,7 @@ set -e
 # set -x
 
 shortname="${0##*/}"
+longname="arbor monitor"
 script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 
 DOCKER_CMD="docker"
@@ -56,7 +57,8 @@ function print_usage()
     echo "   operation can be one of:"
     echo ""
     echo "     docker-pull: Download the $shortname docker image"
-    echo "     docker-run [interactive]: Create and start the $shortname docker container"
+    echo "     docker-run: Create and start the $shortname docker container"
+    echo "     docker-run-interactive: Start a shell to run $shortname (for debugging)"
     echo "     docker-status: Show the status of the $shortname docker container"
     echo "     docker-kill: Kill the $shortname docker container"
     echo "     docker-rm: Delete the $shortname docker container (can recreate with docker-run)"
@@ -221,7 +223,7 @@ function docker-run()
         debug_opt="--debug"
     fi
 
-    docker_command=(python3.6 /app/arbor-monitor
+    docker_run_params=(python3.6 /app/arbor-monitor
                               $debug_opt
                               --bind-port "$bind_port"
                               --arbor-api-prefix "$arbor_rest_api_prefix"
@@ -233,25 +235,24 @@ function docker-run()
 
     if [ $1 == "interactive" ]; then
         echo "Starting interactive shell."
-        echo -n "Start the service using:"
-        for arg in "${docker_command[@]}" ; do echo -n " \"$arg\""; done;
+        echo -n "Start the service manually using:"
+        for arg in "${docker_run_params[@]}" ; do echo -n " \"$arg\""; done;
         echo ""
-        docker_command=(/bin/bash)
+        docker_run_params=(/bin/bash)
         exec_options=(-it)
     else
-        echo "Starting the arbor-monitor as a docker service."
-        echo "The arbor monitor will restart on error or on system restart."
+        echo "Starting the $longname as a docker service."
+        echo "The the $longname service will restart on error or on system restart."
         echo "Use '$shortname docker-kill' to terminate the service"
     fi
 
     echo "Starting container \"$container_name\" from $docker_image_id:$docker_image_tag (on $bind_address:$bind_port)"
-    echo "(params: \"${docker_command[@]}\")"
     $DOCKER_CMD run "${exec_options[@]}" \
         --name "$container_name" \
         -p "$bind_address:$bind_port:$bind_port" \
         "${cert_key_mount_args[@]}" \
         "$docker_image_id:$docker_image_tag" \
-        "${docker_command[@]}"
+        "${docker_run_params[@]}"
 }
 
 function docker-run-interactive()
