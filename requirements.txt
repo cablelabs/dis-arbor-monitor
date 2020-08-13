@@ -15,8 +15,17 @@
 #
 #  bin/setup-virtualenv
 #
+
 Cython==0.29.14
 demjson==2.2.4
+dis-client-sdk==0.0.2
+  pydantic==1.6.1
+    dataclasses==0.7
+  requests==2.22.0
+    certifi==2019.11.28
+    chardet==3.0.4
+    idna==2.8
+    urllib3==1.25.7
 falcon==2.0.0
 gunicorn==20.0.0
   setuptools==45.1.0
@@ -50,9 +59,4 @@ Quart==0.6.15
     MarkupSafe==1.1.1
   multidict==4.5.2
   sortedcontainers==2.1.0
-requests==2.22.0
-  certifi==2019.11.28
-  chardet==3.0.4
-  idna==2.8
-  urllib3==1.25.7
 wheel==0.34.2

@@ -1,6 +1,6 @@
 from quart import Quart,request
 import json, requests, logging, os, argparse
-from attack import Attack
+from dis_client_sdk import DisClient
 
 logging_filename=None
 logging_filemode=None
@@ -34,20 +34,47 @@ async def index():
         logger.info(f"Received notification of ONGOING attack (ID: {attack_id})")
     else:
         logger.info(f"Received notification of COMPLETED attack (ID: {attack_id})")
-        attack = Attack(attack_id, args.report_provider_name)
-        attack.start_time = attack_attributes["start_time"]
-        attack.stop_time = attack_attributes["stop_time"]
-        attack.stop_time = attack_attributes["stop_time"]
+
         attack_subobjects = attack_attributes["subobject"]
-        attack.peak_pps = attack_subobjects["impact_pps"]
-        attack.peak_bps = attack_subobjects["impact_bps"]
-        attack.misuse_types = attack_subobjects["misuse_types"]
-        attack.source_ips = get_source_ips(attack_id=attack.id)
-        if len(attack.source_ips):
-            event_object = attack.output()
-            send_event(event_object, args.report_consumer_url)
-        else:
-            logger.warning(f"No source IPs found for attack {attack_id}")
+        attack_source_ips = get_source_ips(attack_id=attack_id)
+        logger.info(f"Attack ID {attack_id} has {len(attack_source_ips)} source IPs")
+
+        event_id = dis_client.add_attack_event(start_timestamp=attack_attributes["start_time"],
+                                               end_timestamp=attack_attributes["stop_time"],
+                                               attack_type=attack_subobjects["misuse_types"])
+
+        # Add attributes to the attack event
+        dis_client.add_attribute_to_event(event_uuid=event_id,
+                                          name="impact_pps",
+                                          enum="BPS",
+                                          value=attack_subobjects["impact_bps"])
+        dis_client.add_attribute_to_event(event_uuid=event_id,
+                                          name="impact_pps",
+                                          enum="PPS",
+                                          value=attack_subobjects["impact_bps"])
+
+        for attack_source_ip in attack_source_ips:
+            dis_client.add_attack_source_to_event(event_id,
+                                                  ip=attack_source_ip,
+                                                  attribute_list=[
+                                                      {
+                                                          "enum": "SEVERITY",
+                                                          "name": "Severity Level",
+                                                          "value": "high"
+                                                      },
+                                                      {
+                                                          "enum": "BPS",
+                                                          "name": "Bytes per second",
+                                                          "value": "1300"
+                                                      }])
+    # TODO: Test attributes - REMOVE
+
+    staged_event_ids = dis_client.get_staged_event_ids()
+    logger.info(f"Attack ID {attack_id}: Staged event IDs: {staged_event_ids}")
+    # TODO: Add accessor for the DIS client base URL
+    logger.info(f"Attack ID {attack_id}: Sending report to the DIS report server {dis_client_info._base_url}")
+    dis_client.send()
+    logger.info(f"Attack ID {attack_id}: Report sent to {dis_client_info._base_url}")
 
     return 'hello'
 
@@ -118,13 +145,12 @@ arg_parser.add_argument ('--arbor-api-token', "-aat,", required=False, action='s
                               "(or DIS_ARBOR_MON_REST_API_TOKEN)")
 arg_parser.add_argument ('--report-consumer-url', "-rcu,", required=False, action='store', type=str,
                          default = os.environ.get('DIS_ARBOR_MON_REPORT_CONSUMER_URL'),
-                         help="Specifies the API prefix to use for posting the attack report"
-                              "(e.g. 'https://my-report-server.acme.com:8080/api/v1/data_ingester_resource/?username=crituser&api_key=abcd') "
+                         help="Specifies the API prefix to use for submitting attack reports"
                               "(or DIS_ARBOR_MON_REPORT_CONSUMER_URL)")
-arg_parser.add_argument ('--report-provider-name', "-rpn,", required=False, action='store', type=str,
-                         default = os.environ.get('DIS_ARBOR_MON_REPORT_PROVIDER_NAME'),
-                         help="Specify the name of the data provider to include in the consumer reports "
-                              "(or DIS_ARBOR_MON_REPORT_PROVIDER_NAME)")
+arg_parser.add_argument ('--report-consumer-api-key', "-rckey,", required=False, action='store', type=str,
+                         default = os.environ.get('DIS_ARBOR_MON_REPORT_API_KEY'),
+                         help="Specify the API key to use for submitting attack reports "
+                              "(or DIS_ARBOR_MON_REPORT_API_KEY)")
 arg_parser.add_argument ('--debug', "-d,", required=False, action='store_true',
                          default = os.environ.get('DIS_ARBOR_DEBUG') == "True",
                          help="Enables debugging output/checks")
@@ -140,9 +166,14 @@ logger.info(f"Cert chain file: {cert_chain_filename}")
 logger.info(f"Cert key file: {cert_key_filename}")
 logger.info(f"Arbor API prefix: {args.arbor_api_prefix}")
 logger.info(f"Arbor API token: {args.arbor_api_token}")
-logger.info(f"Provider name: {args.report_provider_name}")
 logger.info(f"Consumer URL: {args.report_consumer_url}")
+logger.info(f"Consumer URL: {args.report_consumer_api_key}")
 logger.info(f"Debug: {args.debug}")
+
+dis_client = DisClient(api_key=args.report_consumer_api_key)
+
+dis_client_info = dis_client.get_info()
+print("DIS client name: ", dis_client_info["name"])
 
 app.run(debug=args.debug, host=args.bind_address, port=args.bind_port,
         certfile=cert_chain_filename, keyfile=cert_key_filename)

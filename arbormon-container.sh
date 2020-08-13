@@ -89,8 +89,8 @@ function print_usage()
     echo "       (default \"$DEF_ARBOR_REST_API_TOKEN\")"
     echo "   [--report-consumer-url <url for posting report data>]"
     echo "       (default \"$DEF_REPORT_CONSUMER_URL\")"
-    echo "   [--report-provider-name <provider name for reporting>]"
-    echo "       (default \"$DEF_REPORT_PROVIDER_NAME\")"
+    echo "   [--report-consumer-api-key <API key for reporting>]"
+    echo "       (default \"$DEF_REPORT_API_KEY\")"
 }
 
 function process_arguments()
@@ -109,7 +109,7 @@ function process_arguments()
     arbor_rest_api_prefix="$DEF_ARBOR_REST_API_PREFIX"
     arbor_rest_api_token="$DEF_ARBOR_REST_API_TOKEN"
     report_consumer_url="$DEF_REPORT_CONSUMER_URL"
-    report_provider_name="$DEF_REPORT_PROVIDER_NAME"
+    report_consumer_api_key="$DEF_REPORT_CONSUMER_API_KEY"
     debug=
 
     while [[ $1 == --* ]]; do
@@ -154,9 +154,9 @@ function process_arguments()
             shift
             report_consumer_url="$1"
             shift || bailout_with_usage "missing parameter to $opt_name"
-        elif [ "$opt_name" == "--report-provider-name" ]; then
+        elif [ "$opt_name" == "--report-consumer-api-key" ]; then
             shift
-            report_provider_name="$1"
+            report_consumer_api_key="$1"
             shift || bailout_with_usage "missing parameter to $opt_name"
         elif [ "$opt_name" == "--debug" ]; then
             shift
@@ -184,7 +184,7 @@ function process_arguments()
         echo "arbor_rest_api_prefix: $arbor_rest_api_prefix"
         echo "arbor_rest_api_token: $arbor_rest_api_token"
         echo "report_consumer_url: $report_consumer_url"
-        echo "report_provider_name: $report_provider_name"
+        echo "report_consumer_api_key: $report_consumer_api_key"
     fi
 }
 
@@ -229,7 +229,7 @@ function docker-run()
                               --arbor-api-prefix "$arbor_rest_api_prefix"
                               --arbor-api-token "$arbor_rest_api_token"
                               --report-consumer-url "$report_consumer_url"
-                              --report-provider-name "$report_provider_name"
+                              --report-consumer-api-key "$report_consumer_api_key"
                               "${cert_key_command_args[@]}")
     exec_options=(--read-only -d --restart unless-stopped)
 
