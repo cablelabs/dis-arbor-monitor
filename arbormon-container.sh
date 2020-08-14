@@ -12,7 +12,7 @@ script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 DOCKER_CMD="docker"
 # https://community.cablelabs.com/mvn/dis-docker/dis-arbor-monitor
 DEF_IMAGE_LOCATION="community.cablelabs.com:4567/dis-docker/dis-arbor-monitor"
-DEF_IMAGE_TAG=latest
+DEF_IMAGE_TAG=dissarm
 DEF_CONTAINER_NAME=dis-arbor-monitor-service
 #DEF_CERTS_DIR=/etc/dis-arbor-monitor/
 DEF_TLS_CERT_CHAIN_FILE=

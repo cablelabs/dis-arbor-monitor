@@ -1,5 +1,5 @@
 DOCKER_REGISTRY := community.cablelabs.com:4567
-DOCKER_IMAGE_PATH := dis-docker/dis-arbor-monitor:latest
+DOCKER_IMAGE_PATH := dis-docker/dis-arbor-monitor:dissarm
 
 docker-build:
 	docker build -t $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_PATH) .
