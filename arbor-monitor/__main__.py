@@ -27,48 +27,59 @@ async def index():
     if attack_attributes["ongoing"]:
         logger.info(f"Received notification of ONGOING attack (ID: {attack_id})")
     else:
-        logger.info(f"Received notification of COMPLETED attack (ID: {attack_id})")
+        logger.info(f"Received notification of COMPLETED attack (Attack ID: {attack_id})")
 
         attack_subobjects = attack_attributes["subobject"]
-        attack_source_ips = get_source_ips(attack_id=attack_id)
-        logger.info(f"Attack ID {attack_id} has {len(attack_source_ips)} source IPs")
+        attack_source_ips = get_source_ips(attack_id)
+
+        start_time = attack_attributes.get("start_time")
+        stop_time = attack_attributes.get("stop_time")
+        misuse_types = attack_attributes.get("misuse_types")
+        impact_bps = attack_subobjects.get("impact_bps")
+        impact_pps = attack_subobjects.get("impact_pps")
+
+        logger.info(f"Attack ID {attack_id}: Misuse Types: {misuse_types}")
+        logger.info(f"Attack ID {attack_id}: Start/stop time: {start_time}/{stop_time}")
+        logger.debug(f"Attack ID {attack_id}: Impact BPS: {impact_bps}")
+        logger.debug(f"Attack ID {attack_id}: Impact PPS: {impact_pps}")
+        logger.info(f"Attack ID {attack_id}: Found {len(attack_source_ips)} source IPs")
+        logger.debug(f"Attack ID {attack_id}: Source IPs (first 25): {attack_source_ip[0:25]}")
 
         event_id = dis_client.add_attack_event(start_timestamp=attack_attributes["start_time"],
                                                end_timestamp=attack_attributes["stop_time"],
                                                attack_type=attack_subobjects["misuse_types"])
 
-        # Add attributes to the attack event
-        dis_client.add_attribute_to_event(event_uuid=event_id,
-                                          name="impact_pps",
-                                          enum="BPS",
-                                          value=attack_subobjects["impact_bps"])
-        dis_client.add_attribute_to_event(event_uuid=event_id,
-                                          name="impact_pps",
-                                          enum="PPS",
-                                          value=attack_subobjects["impact_bps"])
+        if args.dry_run:
+            logger.info(f"Attack ID {attack_id}: Running in DRY RUN mode - not posting attack")
+        else:
+            # Add attributes to the attack event
+            dis_client.add_attribute_to_event(event_uuid=event_id,
+                                              name="impact_pps", enum="BPS", value=impact_bps)
+            dis_client.add_attribute_to_event(event_uuid=event_id,
+                                              name="impact_pps", enum="PPS", value=impact_pps)
 
-        for attack_source_ip in attack_source_ips:
-            dis_client.add_attack_source_to_event(event_id,
-                                                  ip=attack_source_ip,
-                                                  attribute_list=[
-                                                      {
-                                                          "enum": "SEVERITY",
-                                                          "name": "Severity Level",
-                                                          "value": "high"
-                                                      },
-                                                      {
-                                                          "enum": "BPS",
-                                                          "name": "Bytes per second",
-                                                          "value": "1300"
-                                                      }])
-    # TODO: Test attributes - REMOVE
+            for attack_source_ip in attack_source_ips:
+                dis_client.add_attack_source_to_event(event_id,
+                                                      ip=attack_source_ip,
+                                                      attribute_list=[
+                                                          {
+                                                              "enum": "SEVERITY",
+                                                              "name": "Severity Level",
+                                                              "value": "high"
+                                                          },
+                                                          {
+                                                              "enum": "BPS",
+                                                              "name": "Bytes per second",
+                                                              "value": "1300"
+                                                          }])
+        # TODO: Test attributes - REMOVE
 
-    staged_event_ids = dis_client.get_staged_event_ids()
-    logger.info(f"Attack ID {attack_id}: Staged event IDs: {staged_event_ids}")
-    # TODO: Add accessor for the DIS client base URL
-    logger.info(f"Attack ID {attack_id}: Sending report to the DIS report server {dis_client_info._base_url}")
-    dis_client.send()
-    logger.info(f"Attack ID {attack_id}: Report sent to {dis_client_info._base_url}")
+        staged_event_ids = dis_client.get_staged_event_ids()
+        logger.info(f"Attack ID {attack_id}: Staged event IDs: {staged_event_ids}")
+        # TODO: Add accessor for the DIS client base URL
+        logger.info(f"Attack ID {attack_id}: Sending report to the DIS report server {dis_client_info._base_url}")
+        dis_client.send()
+        logger.info(f"Attack ID {attack_id}: Report sent to {dis_client_info._base_url}")
 
     return 'hello'
 
@@ -112,6 +123,12 @@ def get_source_ips(attack_id):
 arg_parser = argparse.ArgumentParser(description='Monitors for Arbor attack events and posts source address reports "'
                                                  'to the specified event consumer')
 
+arg_parser.add_argument ('--debug', "-d,", required=False, action='store_true',
+                         default = os.environ.get('DIS_ARBORMON_DEBUG') == "True",
+                         help="Enables debugging output/checks")
+arg_parser.add_argument ('--dry-run', "-dr,", required=False, action='store_true',
+                         default = os.environ.get('DIS_ARBORMON_DRY_RUN') == "True",
+                         help="Enables a dry-tun test (doesn't upload to a server - just logs)")
 arg_parser.add_argument ('--bind-address', "-a", required=False, action='store', type=str,
                          default=os.environ.get('DIS_ARBORMON_BIND_ADDRESS', "0.0.0.0"),
                          help="specify the address to bind the monitor to for Arbor webook notifications"
@@ -149,9 +166,6 @@ arg_parser.add_argument ('--report-consumer-api-key', "-rckey,", required=not ar
                          action='store', type=str, default=arg_default,
                          help="Specify the API key to use for submitting attack reports "
                               "(or DIS_ARBORMON_REPORT_API_KEY)")
-arg_parser.add_argument ('--debug', "-d,", required=False, action='store_true',
-                         default = os.environ.get('DIS_ARBOR_DEBUG') == "True",
-                         help="Enables debugging output/checks")
 
 args = arg_parser.parse_args ()
 
@@ -165,6 +179,8 @@ logger = logging.getLogger ('dis-arbor-monitor')
 cert_chain_filename = args.cert_chain_file.name if args.cert_chain_file else None
 cert_key_filename = args.cert_key_file.name if args.cert_key_file else None
 
+logger.info(f"Debug: {args.debug}")
+logger.info(f"Debug: {args.dry_run}")
 logger.info(f"Bind address: {args.bind_address}")
 logger.info(f"Bind port: {args.bind_port}")
 logger.info(f"Cert chain file: {cert_chain_filename}")
@@ -173,12 +189,13 @@ logger.info(f"Arbor API prefix: {args.arbor_api_prefix}")
 logger.info(f"Arbor API token: {args.arbor_api_token}")
 logger.info(f"Consumer URL: {args.report_consumer_url}")
 logger.info(f"Consumer API key: {args.report_consumer_api_key}")
-logger.info(f"Debug: {args.debug}")
 
-dis_client = DisClient(api_key=args.report_consumer_api_key)
-
-dis_client_info = dis_client.get_info()
-print("DIS client name: ", dis_client_info["name"])
+if args.dry_run:
+    logger.info("RUNNING IN DRY-RUN MODE")
+else:
+    dis_client = DisClient(api_key=args.report_consumer_api_key)
+    dis_client_info = dis_client.get_info()
+    print("DIS client name: ", dis_client_info["name"])
 
 app.run(debug=args.debug, host=args.bind_address, port=args.bind_port,
         certfile=cert_chain_filename, keyfile=cert_key_filename)
