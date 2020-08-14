@@ -113,42 +113,42 @@ arg_parser = argparse.ArgumentParser(description='Monitors for Arbor attack even
                                                  'to the specified event consumer')
 
 arg_parser.add_argument ('--bind-address', "-a", required=False, action='store', type=str,
-                         default=os.environ.get('DIS_ARBOR_MON_BIND_ADDRESS', "0.0.0.0"),
+                         default=os.environ.get('DIS_ARBORMON_BIND_ADDRESS', "0.0.0.0"),
                          help="specify the address to bind the monitor to for Arbor webook notifications"
-                              "(or set DIS_ARBOR_MON_BIND_ADDRESS)")
+                              "(or set DIS_ARBORMON_BIND_ADDRESS)")
 arg_parser.add_argument ('--bind-port', "-p", required=False, action='store', type=int,
-                         default = os.environ.get('DIS_ARBOR_MON_BIND_PORT', 443),
+                         default = os.environ.get('DIS_ARBORMON_BIND_PORT', 443),
                          help="specify the port to bind the HTTP/HTTPS server to "
-                              "(or set DIS_ARBOR_MON_BIND_PORT)")
+                              "(or set DIS_ARBORMON_BIND_PORT)")
 arg_parser.add_argument ('--cert-chain-file', "-ccf", required=False, action='store', type=open,
-                         default = os.environ.get('DIS_ARBOR_MON_CERT_FILE'),
+                         default = os.environ.get('DIS_ARBORMON_CERT_FILE'),
                          help="the file path containing the certificate chain to use for HTTPS connections "
-                              "(or set DIS_ARBOR_MON_CERT_FILE)")
-arg_default = os.environ.get('DIS_ARBOR_MON_KEY_FILE')
+                              "(or set DIS_ARBORMON_CERT_FILE)")
+arg_default = os.environ.get('DIS_ARBORMON_KEY_FILE')
 arg_parser.add_argument ('--cert-key-file', "-ckf", required=not arg_default,
                          action='store', type=open, default=arg_default,
                          help="the file path containing the key for the associated certificate file " 
-                              "(or DIS_ARBOR_MON_KEY_FILE)")
-arg_default = os.environ.get('DIS_ARBOR_MON_REST_API_PREFIX')
+                              "(or DIS_ARBORMON_KEY_FILE)")
+arg_default = os.environ.get('DIS_ARBORMON_REST_API_PREFIX')
 arg_parser.add_argument ('--arbor-api-prefix', "-aap,", required=not arg_default,
                          action='store', type=str, default=arg_default,
                          help="Specify the Arbor API prefix to use for REST calls "
                               "(e.g. 'https://arbor001.acme.com') "
-                              "(or set DIS_ARBOR_MON_REST_API_PREFIX)")
-arg_default=os.environ.get('DIS_ARBOR_MON_REST_API_TOKEN')
+                              "(or set DIS_ARBORMON_REST_API_PREFIX)")
+arg_default=os.environ.get('DIS_ARBORMON_REST_API_TOKEN')
 arg_parser.add_argument ('--arbor-api-token', "-aat,", required=not arg_default,
                          action='store', type=str, default=arg_default,
                          help="Specify the Arbor API token to use for REST calls "
-                              "(or DIS_ARBOR_MON_REST_API_TOKEN)")
+                              "(or DIS_ARBORMON_REST_API_TOKEN)")
 arg_parser.add_argument ('--report-consumer-url', "-rcu,", required=False, action='store', type=str,
-                         default = os.environ.get('DIS_ARBOR_MON_REPORT_CONSUMER_URL'),
+                         default = os.environ.get('DIS_ARBORMON_REPORT_CONSUMER_URL'),
                          help="Specifies the API prefix to use for submitting attack reports"
-                              "(or DIS_ARBOR_MON_REPORT_CONSUMER_URL)")
-arg_default=os.environ.get('DIS_ARBOR_MON_REPORT_API_KEY')
+                              "(or DIS_ARBORMON_REPORT_CONSUMER_URL)")
+arg_default=os.environ.get('DIS_ARBORMON_REPORT_API_KEY')
 arg_parser.add_argument ('--report-consumer-api-key', "-rckey,", required=not arg_default,
                          action='store', type=str, default=arg_default,
                          help="Specify the API key to use for submitting attack reports "
-                              "(or DIS_ARBOR_MON_REPORT_API_KEY)")
+                              "(or DIS_ARBORMON_REPORT_API_KEY)")
 arg_parser.add_argument ('--debug', "-d,", required=False, action='store_true',
                          default = os.environ.get('DIS_ARBOR_DEBUG') == "True",
                          help="Enables debugging output/checks")
