@@ -43,15 +43,15 @@ async def index():
         logger.debug(f"Attack ID {attack_id}: Impact BPS: {impact_bps}")
         logger.debug(f"Attack ID {attack_id}: Impact PPS: {impact_pps}")
         logger.info(f"Attack ID {attack_id}: Found {len(attack_source_ips)} source IPs")
-        logger.debug(f"Attack ID {attack_id}: Source IPs (first 25): {attack_source_ip[0:25]}")
-
-        event_id = dis_client.add_attack_event(start_timestamp=attack_attributes["start_time"],
-                                               end_timestamp=attack_attributes["stop_time"],
-                                               attack_type=attack_subobjects["misuse_types"])
+        logger.debug(f"Attack ID {attack_id}: Source IPs (first 25): {attack_source_ips[0:25]}")
 
         if args.dry_run:
             logger.info(f"Attack ID {attack_id}: Running in DRY RUN mode - not posting attack")
         else:
+            event_id = dis_client.add_attack_event(start_timestamp=attack_attributes["start_time"],
+                                                   end_timestamp=attack_attributes["stop_time"],
+                                                   attack_type=attack_subobjects["misuse_types"])
+
             # Add attributes to the attack event
             dis_client.add_attribute_to_event(event_uuid=event_id,
                                               name="impact_pps", enum="BPS", value=impact_bps)
@@ -72,14 +72,14 @@ async def index():
                                                               "name": "Bytes per second",
                                                               "value": "1300"
                                                           }])
-        # TODO: Test attributes - REMOVE
+                # TODO: Test attributes - REMOVE
 
-        staged_event_ids = dis_client.get_staged_event_ids()
-        logger.info(f"Attack ID {attack_id}: Staged event IDs: {staged_event_ids}")
-        # TODO: Add accessor for the DIS client base URL
-        logger.info(f"Attack ID {attack_id}: Sending report to the DIS report server {dis_client_info._base_url}")
-        dis_client.send()
-        logger.info(f"Attack ID {attack_id}: Report sent to {dis_client_info._base_url}")
+            staged_event_ids = dis_client.get_staged_event_ids()
+            logger.info(f"Attack ID {attack_id}: Staged event IDs: {staged_event_ids}")
+            # TODO: Add accessor for the DIS client base URL
+            logger.info(f"Attack ID {attack_id}: Sending report to the DIS report server {dis_client_info._base_url}")
+            dis_client.send()
+            logger.info(f"Attack ID {attack_id}: Report sent to {dis_client_info._base_url}")
 
     return 'hello'
 
@@ -116,7 +116,6 @@ def get_source_ips(attack_id):
                             verify=False,headers={"X-Arbux-APIToken":args.arbor_api_token})
     json_response = response.json()
     source_ips = json_response['data']['attributes']['source_ips']
-    logger.debug(f"Found Source IPs for attack ID {attack_id}: {source_ips}")
     return source_ips
 
 
