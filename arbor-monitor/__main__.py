@@ -43,7 +43,7 @@ async def index():
         logger.debug(f"Attack ID {attack_id}: Impact BPS: {impact_bps}")
         logger.debug(f"Attack ID {attack_id}: Impact PPS: {impact_pps}")
         logger.info(f"Attack ID {attack_id}: Found {len(attack_source_ips)} source IPs")
-        logger.debug(f"Attack ID {attack_id}: Source IPs (first 25): {attack_source_ips[0:25]}")
+        logger.debug(f"Attack ID {attack_id}: Source IPs (first 50): {attack_source_ips[0:50]}")
 
         if args.dry_run:
             logger.info(f"Attack ID {attack_id}: Running in DRY RUN mode - not posting attack")
@@ -59,6 +59,7 @@ async def index():
                                               name="impact_pps", enum="PPS", value=impact_pps)
 
             for attack_source_ip in attack_source_ips:
+                # TODO: Test attributes - REMOVE
                 dis_client.add_attack_source_to_event(event_id,
                                                       ip=attack_source_ip,
                                                       attribute_list=[
@@ -72,7 +73,6 @@ async def index():
                                                               "name": "Bytes per second",
                                                               "value": "1300"
                                                           }])
-                # TODO: Test attributes - REMOVE
 
             staged_event_ids = dis_client.get_staged_event_ids()
             logger.info(f"Attack ID {attack_id}: Staged event IDs: {staged_event_ids}")
