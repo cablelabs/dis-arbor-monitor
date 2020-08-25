@@ -1,5 +1,5 @@
 from quart import Quart,request
-import json, requests, logging, os, argparse
+import json, requests, logging, os, argparse, dateutil.parser, datetime
 from dis_client_sdk import DisClient
 
 #disable Warning for SSL.
@@ -48,8 +48,12 @@ async def index():
         if args.dry_run:
             logger.info(f"Attack ID {attack_id}: Running in DRY RUN mode - not posting attack")
         else:
-            event_id = dis_client.add_attack_event(start_timestamp=attack_attributes["start_time"],
-                                                   end_timestamp=attack_attributes["stop_time"],
+            start_timestamp = int(dateutil.parser.isoparse(start_time).timestamp())
+            stop_timestamp = int(dateutil.parser.isoparse(stop_time).timestamp())
+            logger.debug(f"Attack ID {attack_id}: Start/stop timestamp: {start_timestamp}/{stop_timestamp}")
+
+            event_id = dis_client.add_attack_event(start_timestamp=start_timestamp,
+                                                   end_timestamp=stop_timestamp,
                                                    attack_type=attack_subobjects["misuse_types"])
 
             # Add attributes to the attack event
