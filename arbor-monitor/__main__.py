@@ -77,9 +77,9 @@ async def index():
             staged_event_ids = dis_client.get_staged_event_ids()
             logger.info(f"Attack ID {attack_id}: Staged event IDs: {staged_event_ids}")
             # TODO: Add accessor for the DIS client base URL
-            logger.info(f"Attack ID {attack_id}: Sending report to the DIS report server {dis_client_info._base_url}")
+            logger.info(f"Attack ID {attack_id}: Sending report ?? (FIX ME)")
             dis_client.send()
-            logger.info(f"Attack ID {attack_id}: Report sent to {dis_client_info._base_url}")
+            logger.info(f"Attack ID {attack_id}: Report sent to ?? (FIX ME)")
 
     return 'hello'
 
@@ -179,7 +179,7 @@ cert_chain_filename = args.cert_chain_file.name if args.cert_chain_file else Non
 cert_key_filename = args.cert_key_file.name if args.cert_key_file else None
 
 logger.info(f"Debug: {args.debug}")
-logger.info(f"Debug: {args.dry_run}")
+logger.info(f"Dry run: {args.dry_run}")
 logger.info(f"Bind address: {args.bind_address}")
 logger.info(f"Bind port: {args.bind_port}")
 logger.info(f"Cert chain file: {cert_chain_filename}")
