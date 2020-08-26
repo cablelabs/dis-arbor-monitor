@@ -204,14 +204,6 @@ function docker-run()
         bailout "Arbor rest API token not specified (use --arbor-api-token to specify)"
     fi
 
-    if [ -z "$report_consumer_url" ]; then
-        bailout "Report consumer URL not specified (use --report-consumer-url to specify)"
-    fi
-
-    if [ -z "$report_provider_name" ]; then
-        bailout "Report provider not specified (use --report-provider-name to specify)"
-    fi
-
     if [ ! -z "$tls_cert_chain_file" -a ! -z "$tls_priv_key_file" ]; then
         cert_key_mount_args=(--mount type=bind,source="$tls_cert_chain_file",target=/app/lib/tls-cert-chain.pem,readonly
                              --mount type=bind,source="$tls_priv_key_file",target=/app/lib/tls-key.pem,readonly)
