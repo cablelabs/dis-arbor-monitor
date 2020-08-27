@@ -54,13 +54,21 @@ async def index():
 
             event_id = dis_client.add_attack_event(start_timestamp=start_timestamp,
                                                    end_timestamp=stop_timestamp,
-                                                   attack_type=attack_subobjects["misuse_types"])
+                                                   attack_type=attack_subobjects.get("misuse_types"))
 
             # Add attributes to the attack event
             dis_client.add_attribute_to_event(event_uuid=event_id,
-                                              name="impact_pps", enum="BPS", value=impact_bps)
+                                              name="impact_bps", enum="BPS", value=impact_bps)
             dis_client.add_attribute_to_event(event_uuid=event_id,
                                               name="impact_pps", enum="PPS", value=impact_pps)
+            dis_client.add_attribute_to_event(event_uuid=event_id,
+                                              name="local_attack_id", enum="BIGINT", value=attack_id)
+            dis_client.add_attribute_to_event(event_uuid=event_id,
+                                              name="target_host_address", enum="IPV4",
+                                              value=attack_subobjects.get("host_address"))
+            dis_client.add_attribute_to_event(event_uuid=event_id,
+                                              name="source_boundary", enum="STR",
+                                              value=attack_subobjects.get("impact_boundary"))
 
             for attack_source_ip in attack_source_ips:
                 # TODO: Test attributes - REMOVE
