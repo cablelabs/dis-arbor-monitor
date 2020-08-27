@@ -43,7 +43,7 @@ async def index():
         logger.debug(f"Attack ID {attack_id}: Impact BPS: {impact_bps}")
         logger.debug(f"Attack ID {attack_id}: Impact PPS: {impact_pps}")
         logger.info(f"Attack ID {attack_id}: Found {len(attack_source_ips)} source IPs")
-        logger.debug(f"Attack ID {attack_id}: Source IPs (first 50): {attack_source_ips[0:50]}")
+        logger.info(f"Attack ID {attack_id}: Source IPs (first 50): {attack_source_ips[0:50]}")
 
         if args.dry_run:
             logger.info(f"Attack ID {attack_id}: Running in DRY RUN mode - not posting attack")
@@ -170,7 +170,7 @@ arg_parser.add_argument ('--report-consumer-api-key', "-rckey,", required=not ar
                          help="Specify the API key to use for submitting attack reports "
                               "(or DIS_ARBORMON_REPORT_API_KEY)")
 
-args = arg_parser.parse_args ()
+args = arg_parser.parse_args()
 
 logging_filename=None
 logging_filemode=None
@@ -198,7 +198,11 @@ if args.dry_run:
 else:
     dis_client = DisClient(api_key=args.report_consumer_api_key)
     dis_client_info = dis_client.get_info()
-    print("DIS client name: ", dis_client_info["name"])
+    logger.info("DIS client name: ", dis_client_info.get("name"))
+    org = dis_client_info.get("organization")
+    logger.info("DIS client organization: ", org.get("name") if org else "Unknown")
+    logger.info("DIS client description: ", dis_client_info.get("shortDescription"))
+    logger.info("DIS client contact: ", dis_client_info.get("contactEmail"))
 
 app.run(debug=args.debug, host=args.bind_address, port=args.bind_port,
         certfile=cert_chain_filename, keyfile=cert_key_filename)
