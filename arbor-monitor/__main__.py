@@ -206,11 +206,17 @@ if args.dry_run:
 else:
     dis_client = DisClient(api_key=args.report_consumer_api_key)
     dis_client_info = dis_client.get_info()
-    logger.info("DIS client name: ", dis_client_info.get("name"))
+    logger.info(f"DIS client name: {dis_client_info.get('name')}")
     org = dis_client_info.get("organization")
-    logger.info("DIS client organization: ", org.get("name") if org else "Unknown")
-    logger.info("DIS client description: ", dis_client_info.get("shortDescription"))
-    logger.info("DIS client contact: ", dis_client_info.get("contactEmail"))
+    logger.info(f"DIS client organization: {org.get('name') if org else 'Unknown'}")
+    logger.info(f"DIS client description: {dis_client_info.get('shortDescription')}")
+    logger.info(f"DIS client contact: {org.get('contactEmail')}")
+    client_type = dis_client_info.get("clientType")
+    logger.info(f"Client type name: {client_type.get('name')}")
+    logger.info(f"Client type maker: {client_type.get('maker')}")
+    logger.info(f"Client type version: {client_type.get('version')}")
+    # TODO: Check the maker (and version?)
+
 
 app.run(debug=args.debug, host=args.bind_address, port=args.bind_port,
         certfile=cert_chain_filename, keyfile=cert_key_filename)
