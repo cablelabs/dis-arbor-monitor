@@ -264,6 +264,14 @@ function docker-restart()
     $DOCKER_CMD container restart $container_name
 }
 
+function docker-update()
+{
+    echo "Attempting to update container image \"$container_name\""
+    docker-kill
+    docker-pull
+    docker-run
+}
+
 function docker-logs()
 {
     echo "Showing logs for container \"$container_name\""
