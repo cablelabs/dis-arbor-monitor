@@ -152,9 +152,8 @@ arg_parser.add_argument ('--cert-chain-file', "-ccf", required=False, action='st
                          default = os.environ.get('DIS_ARBORMON_CERT_FILE'),
                          help="the file path containing the certificate chain to use for HTTPS connections "
                               "(or set DIS_ARBORMON_CERT_FILE)")
-arg_default = os.environ.get('DIS_ARBORMON_KEY_FILE')
-arg_parser.add_argument ('--cert-key-file', "-ckf", required=not arg_default,
-                         action='store', type=open, default=arg_default,
+arg_parser.add_argument ('--cert-key-file', "-ckf", required=False, action='store', type=open,
+                         default = os.environ.get('DIS_ARBORMON_KEY_FILE'),
                          help="the file path containing the key for the associated certificate file " 
                               "(or DIS_ARBORMON_KEY_FILE)")
 arg_default = os.environ.get('DIS_ARBORMON_REST_API_PREFIX')
