@@ -95,6 +95,39 @@ async def index():
 
     return 'hello'
 
+
+def arbor_api_supported():
+    """
+    Checks to ensure the Arbor SP API can be accessed and is a compatible version
+
+    Return:
+        True if the API checks out, and False otherwise
+    """
+
+    response = requests.get(f"{args.arbor_api_prefix}/api/sp",
+                            verify=not args.arbor_api_insecure,
+                            headers={"X-Arbux-APIToken":args.arbor_api_token})
+    if response.status_code != requests.codes.ok:
+        logger.error(f"Error retrieving {response.url}: Status code {response.status_code}")
+        return False
+
+    json_response = response.json()
+    api_type = json_response['meta']['api']
+    api_version = int(json_response['meta']['api_version'])
+
+    if api_type != 'SP':
+        logger.error(f"Found unsupported API (found '{api_type}', expected 'SP'")
+        return False
+
+    if api_version < 6:
+        logger.error(f"Found unsupported API version ({api_version} < 6)")
+        return False
+
+    logger.info(f"Found arbor SP API version {api_version} at {response.url}")
+
+    return True
+
+
 def send_event(event_object, post_url):
     """
     Sends event to consumer URL.
@@ -111,6 +144,7 @@ def send_event(event_object, post_url):
     r = requests.post(url=post_url, json=event_object, headers={"Content-Type": "application/json"})
     logger.debug("POST response: " + r.text)
 
+
 def get_source_ips(attack_id):
     """
     Makes a request to Arbor instance for the source IP that match the Attack ID:
@@ -125,7 +159,8 @@ def get_source_ips(attack_id):
     """
 
     response = requests.get(f"{args.arbor_api_prefix}/api/sp/v6/alerts/{attack_id}/source_ip_addresses",
-                            verify=False,headers={"X-Arbux-APIToken":args.arbor_api_token})
+                            verify=not args.arbor_api_insecure,
+                            headers={"X-Arbux-APIToken":args.arbor_api_token})
     json_response = response.json()
     source_ips = json_response['data']['attributes']['source_ips']
     return source_ips
@@ -142,20 +177,23 @@ arg_parser.add_argument ('--dry-run', "-dr,", required=False, action='store_true
                          help="Enables a dry-tun test (doesn't upload to a server - just logs)")
 arg_parser.add_argument ('--bind-address', "-a", required=False, action='store', type=str,
                          default=os.environ.get('DIS_ARBORMON_BIND_ADDRESS', "0.0.0.0"),
-                         help="specify the address to bind the monitor to for Arbor webook notifications"
-                              "(or set DIS_ARBORMON_BIND_ADDRESS)")
+                         help="specify the address to bind the HTTP/HTTPS server to for receiving "
+                              "Arbor SP webhook notifications (or set DIS_ARBORMON_BIND_ADDRESS)")
 arg_parser.add_argument ('--bind-port', "-p", required=False, action='store', type=int,
                          default = os.environ.get('DIS_ARBORMON_BIND_PORT', 443),
-                         help="specify the port to bind the HTTP/HTTPS server to "
-                              "(or set DIS_ARBORMON_BIND_PORT)")
+                         help="specify the port to bind the HTTP/HTTPS server to for receiving "
+                              "Arbor SP webhook notifications (or set DIS_ARBORMON_BIND_PORT)")
 arg_parser.add_argument ('--cert-chain-file', "-ccf", required=False, action='store', type=open,
                          default = os.environ.get('DIS_ARBORMON_CERT_FILE'),
-                         help="the file path containing the certificate chain to use for HTTPS connections "
-                              "(or set DIS_ARBORMON_CERT_FILE)")
+                         help="the file path containing the certificate chain to use for the "
+                              "HTTPS server connection for receiving Arbor SP webhook notifications "
+                              "(or set DIS_ARBORMON_CERT_FILE). If not set, only HTTP webhook "
+                              "connections will be supported (HTTPS will be disabled).")
 arg_parser.add_argument ('--cert-key-file', "-ckf", required=False, action='store', type=open,
                          default = os.environ.get('DIS_ARBORMON_KEY_FILE'),
-                         help="the file path containing the key for the associated certificate file " 
-                              "(or DIS_ARBORMON_KEY_FILE)")
+                         help="the file path containing the key for the associated leaf certificate " 
+                              "contained in the certificate chain file for the HTTPS server connection"
+                              "for receiving Arbor SP webhook notification (or DIS_ARBORMON_KEY_FILE)")
 arg_default = os.environ.get('DIS_ARBORMON_REST_API_PREFIX')
 arg_parser.add_argument ('--arbor-api-prefix', "-aap,", required=not arg_default,
                          action='store', type=str, default=arg_default,
@@ -167,6 +205,10 @@ arg_parser.add_argument ('--arbor-api-token', "-aat,", required=not arg_default,
                          action='store', type=str, default=arg_default,
                          help="Specify the Arbor API token to use for REST calls "
                               "(or DIS_ARBORMON_REST_API_TOKEN)")
+arg_parser.add_argument ('--arbor-api-insecure', "-aai,", required=False,
+                         action='store_true', default=False,
+                         help="Disable cert checks when invoking Arbor SP API REST calls "
+                              "(or DIS_ARBORMON_REST_API_INSECURE)")
 arg_parser.add_argument ('--report-consumer-url', "-rcu,", required=False, action='store', type=str,
                          default = os.environ.get('DIS_ARBORMON_REPORT_CONSUMER_URL'),
                          help="Specifies the API prefix to use for submitting attack reports"
@@ -216,6 +258,9 @@ else:
     logger.info(f"Client type version: {client_type.get('version')}")
     # TODO: Check the maker (and version?)
 
+if not arbor_api_supported():
+    logger.error("Exiting due to lack of Arbor SP API support")
+    exit(0)
 
 app.run(debug=args.debug, host=args.bind_address, port=args.bind_port,
         certfile=cert_chain_filename, keyfile=cert_key_filename)
