@@ -77,7 +77,7 @@ function print_usage()
     echo "       (default \"$DEF_ARBOR_REST_API_PREFIX\")"
     echo "   [--arbor-api-token <the arbor api token>"
     echo "       (default \"$DEF_ARBOR_REST_API_TOKEN\")"
-    echo "   [--arbor-api-insecure (True|False)"
+    echo "   [--arbor-api-insecure]"
     echo "       (default \"$DEF_ARBOR_REST_API_INSECURE\")"
     echo "   [--report-consumer-url <url for posting report data>]"
     echo "       (default \"$DEF_REPORT_CONSUMER_URL\")"
@@ -100,7 +100,7 @@ function process_arguments()
     bind_port="$DEF_BIND_PORT"
     arbor_rest_api_prefix="$DEF_ARBOR_REST_API_PREFIX"
     arbor_rest_api_token="$DEF_ARBOR_REST_API_TOKEN"
-    arbor_rest_api_insecure="DEF_ARBOR_REST_API_INSECURE"
+    arbor_rest_api_insecure="$DEF_ARBOR_REST_API_INSECURE"
     report_consumer_url="$DEF_REPORT_CONSUMER_URL"
     report_consumer_api_key="$DEF_REPORT_CONSUMER_API_KEY"
     debug=
@@ -145,8 +145,7 @@ function process_arguments()
             shift || bailout_with_usage "missing parameter to $opt_name"
         elif [ "$opt_name" == "--arbor-api-insecure" ]; then
             shift
-            arbor_rest_api_insecure="$1"
-            shift || bailout_with_usage "missing parameter to $opt_name"
+            arbor_rest_api_insecure="True"
         elif [ "$opt_name" == "--report-consumer-url" ]; then
             shift
             report_consumer_url="$1"
@@ -209,6 +208,10 @@ function docker-run()
                                --cert-key-file /app/lib/tls-key.pem)
     fi
 
+    if [ "$arbor_rest_api_insecure" == "True" ]; then
+        arbor_rest_api_insecure_opt="--arbor-api-insecure"
+    fi
+
     if [ ! -z "$debug" ]; then
         debug_opt="--debug"
     fi
@@ -218,7 +221,7 @@ function docker-run()
                               --bind-port "$bind_port"
                               --arbor-api-prefix "$arbor_rest_api_prefix"
                               --arbor-api-token "$arbor_rest_api_token"
-                              --arbor-api-insecure "$arbor_rest_api_insecure"
+                              $arbor_rest_api_insecure_opt
                               --report-consumer-url "$report_consumer_url"
                               --report-consumer-api-key "$report_consumer_api_key"
                               "${cert_key_command_args[@]}")
