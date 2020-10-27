@@ -92,8 +92,8 @@ function process_arguments()
     docker_image_id="$DEF_IMAGE_LOCATION"
     docker_image_tag="$DEF_IMAGE_TAG"
     container_name="$DEF_CONTAINER_NAME"
-    tls_cert_chain_file="$DEF_TLS_CERT_CHAIN_FILE"
-    tls_priv_key_file="$DEF_TLS_PRIV_KEY_FILE"
+    tls_cert_chain_file=$(abs_path_for_file "$DEF_TLS_CERT_CHAIN_FILE")
+    tls_priv_key_file=$(abs_path_for_file "$DEF_TLS_PRIV_KEY_FILE")
     bind_address="$DEF_BIND_ADDRESS"
     bind_port="$DEF_BIND_PORT"
     arbor_rest_api_prefix="$DEF_ARBOR_REST_API_PREFIX"
@@ -215,7 +215,7 @@ function docker-run()
                               "${cert_key_command_args[@]}")
     exec_options=(--read-only -d --restart unless-stopped)
 
-    if [ $1 == "interactive" ]; then
+    if [ "$1" == "interactive" ]; then
         echo "Starting interactive shell."
         echo -n "Start the service manually using:"
         for arg in "${docker_run_params[@]}" ; do echo -n " \"$arg\""; done;
