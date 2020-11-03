@@ -1,6 +1,8 @@
 from quart import Quart,request
 import json, requests, logging, os, argparse, dateutil.parser, datetime
+from ipaddress import IPv4Address, IPv4Network
 from dis_client_sdk import DisClient
+
 
 #disable Warning for SSL.
 requests.packages.urllib3.disable_warnings()
@@ -9,12 +11,11 @@ app = Quart(__name__)
 
 
 @app.route('/',methods=['POST'])
-
-async def index():
+async def process_sightline_webhook_notification():
     """
-    This awaits data from Arbor and then parses it into an attack object.
-    Once an attack has been finished ie ongoing is False, then the code goes back out and queries for
-    Source IPs and adds that to the attack object.
+    This awaits data from Sightline and then parses it into an attack object.
+    Once an attack has been finished (ie ongoing is False), the client will
+    query Sightline for the attack Source IPs and adds them to the attack object.
 
     """
     data = await request.data
@@ -30,11 +31,10 @@ async def index():
         logger.info(f"Received notification of COMPLETED attack (Attack ID: {attack_id})")
 
         attack_subobjects = attack_attributes["subobject"]
-        attack_source_ips = get_source_ips(attack_id)
 
         start_time = attack_attributes.get("start_time")
         stop_time = attack_attributes.get("stop_time")
-        misuse_types = attack_attributes.get("misuse_types")
+        misuse_types = attack_subobjects.get("misuse_types")
         impact_bps = attack_subobjects.get("impact_bps")
         impact_pps = attack_subobjects.get("impact_pps")
 
@@ -42,8 +42,6 @@ async def index():
         logger.info(f"Attack ID {attack_id}: Start/stop time: {start_time}/{stop_time}")
         logger.debug(f"Attack ID {attack_id}: Impact BPS: {impact_bps}")
         logger.debug(f"Attack ID {attack_id}: Impact PPS: {impact_pps}")
-        logger.info(f"Attack ID {attack_id}: Found {len(attack_source_ips)} source IPs")
-        logger.info(f"Attack ID {attack_id}: Source IPs (first 50): {attack_source_ips[0:50]}")
 
         if args.dry_run:
             logger.info(f"Attack ID {attack_id}: Running in DRY RUN mode - not posting attack")
@@ -52,51 +50,41 @@ async def index():
             stop_timestamp = int(dateutil.parser.isoparse(stop_time).timestamp())
             logger.debug(f"Attack ID {attack_id}: Start/stop timestamp: {start_timestamp}/{stop_timestamp}")
 
-            event_id = dis_client.add_attack_event(start_timestamp=start_timestamp,
+            dis_event = dis_client.add_attack_event(start_timestamp=start_timestamp,
                                                    end_timestamp=stop_timestamp,
                                                    attack_type=attack_subobjects.get("misuse_types"))
 
             # Add attributes to the attack event
-            dis_client.add_attribute_to_event(event_uuid=event_id,
+            dis_client.add_attribute_to_event(event_uuid=dis_event,
                                               name="impact_bps", enum="BPS", value=impact_bps)
-            dis_client.add_attribute_to_event(event_uuid=event_id,
+            dis_client.add_attribute_to_event(event_uuid=dis_event,
                                               name="impact_pps", enum="PPS", value=impact_pps)
-            dis_client.add_attribute_to_event(event_uuid=event_id,
+            dis_client.add_attribute_to_event(event_uuid=dis_event,
                                               name="local_attack_id", enum="BIGINT", value=attack_id)
-            dis_client.add_attribute_to_event(event_uuid=event_id,
+            dis_client.add_attribute_to_event(event_uuid=dis_event,
                                               name="target_host_address", enum="IPV4",
                                               value=attack_subobjects.get("host_address"))
-            dis_client.add_attribute_to_event(event_uuid=event_id,
+            dis_client.add_attribute_to_event(event_uuid=dis_event,
                                               name="source_boundary", enum="STR",
                                               value=attack_subobjects.get("impact_boundary"))
 
-            for attack_source_ip in attack_source_ips:
-                # TODO: Test attributes - REMOVE
-                dis_client.add_attack_source_to_event(event_id,
-                                                      ip=attack_source_ip,
-                                                      attribute_list=[
-                                                          {
-                                                              "enum": "SEVERITY",
-                                                              "name": "Severity Level",
-                                                              "value": "high"
-                                                          },
-                                                          {
-                                                              "enum": "BPS",
-                                                              "name": "Bytes per second",
-                                                              "value": "1300"
-                                                          }])
+            # Add the source address info to the event
+            source_ip_list = add_source_ips_v2(dis_event, attack_id)
+
+            logger.info(f"Attack ID {attack_id}: Added {len(source_ip_list)} source IPs")
+            logger.info(f"Attack ID {attack_id}: Source IPs (first 50): {source_ip_list[0:50]}")
 
             staged_event_ids = dis_client.get_staged_event_ids()
             logger.info(f"Attack ID {attack_id}: Staged event IDs: {staged_event_ids}")
             # TODO: Add accessor for the DIS client base URL
-            logger.info(f"Attack ID {attack_id}: Sending report ?? (FIX ME)")
+            logger.info(f"Attack ID {attack_id}: Sending report to DIS server")
             dis_client.send()
-            logger.info(f"Attack ID {attack_id}: Report sent to ?? (FIX ME)")
+            logger.info(f"Attack ID {attack_id}: Report sent to DIS server")
 
     return 'hello'
 
 
-def arbor_api_supported():
+def check_sightline_api_supported():
     """
     Checks to ensure the Arbor SP API can be accessed and is a compatible version
 
@@ -116,14 +104,14 @@ def arbor_api_supported():
     api_version = int(json_response['meta']['api_version'])
 
     if api_type != 'SP':
-        logger.error(f"Found unsupported API (found '{api_type}', expected 'SP'")
+        logger.error(f"Found unsupported Sightline API (found '{api_type}', expected 'SP'")
         return False
 
     if api_version < 6:
-        logger.error(f"Found unsupported API version ({api_version} < 6)")
+        logger.error(f"Found unsupported Sightline API version ({api_version} < 6)")
         return False
 
-    logger.info(f"Found arbor SP API version {api_version} at {response.url}")
+    logger.info(f"Found Arbor Sightline SP API version {api_version} at {response.url}")
 
     return True
 
@@ -145,26 +133,86 @@ def send_event(event_object, post_url):
     logger.debug("POST response: " + r.text)
 
 
-def get_source_ips(attack_id):
+def add_source_ips_v1(dis_event, attack_id):
     """
     Makes a request to Arbor instance for the source IP that match the Attack ID:
 
     Parameters:
-    attack_id 
+    attack_id
+    dis_client
 
     Returns:
 
-    Array of source IPs
+    The list of source IPs added
 
     """
-
     response = requests.get(f"{args.arbor_api_prefix}/api/sp/v6/alerts/{attack_id}/source_ip_addresses",
                             verify=not args.arbor_api_insecure,
                             headers={"X-Arbux-APIToken":args.arbor_api_token})
     json_response = response.json()
-    source_ips = json_response['data']['attributes']['source_ips']
-    return source_ips
+    attack_source_ips = json_response['data']['attributes']['source_ips']
 
+    if args.dry_run:
+        logger.info(f"Attack ID {attack_id}: Running in DRY RUN mode - not posting attack")
+
+    if dis_client and dis_event:
+        for attack_source_ip in attack_source_ips:
+            dis_client.add_attack_source_to_event(dis_event, ip=attack_source_ip)
+    return attack_source_ips
+
+
+def add_source_ips_v2(dis_event, attack_id):
+    """
+    Makes a request to Arbor instance for the source IP that match the Attack ID:
+
+    Parameters:
+    attack_id
+    dis_client
+
+    Returns:
+
+    The list of source IPs added
+
+    """
+    ip_list=[]
+    # The default for this query is normally 5. So need to make sure to over-ride the default limit
+    prefix_query_limit=1000000
+    response = requests.get(f"{args.arbor_api_prefix}/api/sp/v6/alerts/{attack_id}/traffic/src_prefixes/"
+                            f"?query_unit=bps&query_limit={prefix_query_limit}&query_view=network",
+                            verify=not args.arbor_api_insecure,
+                            headers={"X-Arbux-APIToken":args.arbor_api_token})
+    json_response = response.json()
+    for data_elem in json_response['data']:
+        elem_id = "unknown"
+        try:
+            elem_id = data_elem['id']
+            logger.debug("Processing network src prefix " + elem_id)
+            bps_elem = data_elem['attributes']['view']['network']['unit']['bps']
+            elem_name = bps_elem['name']
+            elem_max_bps = bps_elem['max_value']
+            logger.debug(f"    name: {elem_name}, max bps: {elem_max_bps}")
+            net_addr = IPv4Network(elem_name, strict=True)
+            if net_addr.prefixlen != 32:
+                logger.info(f"Skipping src prefix {elem_id}. Network bitmask is not 32 bits ({elem_name})")
+            else:
+                ip_addr_str = str(net_addr.network_address)
+                if dis_client and dis_event:
+                    dis_client.add_attack_source_to_event(dis_event,
+                                                          ip=ip_addr_str,
+                                                          attribute_list=[
+                                                              {
+                                                                  "enum": "BPS",
+                                                                  "name": "Bytes per second",
+                                                                  "value": str(elem_max_bps)
+                                                              }])
+                ip_list.append(ip_addr_str)
+        except Exception as ex:
+            logger.info(f"Error processing '{elem_id}': {ex}")
+
+    return ip_list
+
+
+# MAIN
 
 arg_parser = argparse.ArgumentParser(description='Monitors for Arbor attack events and posts source address reports "'
                                                  'to the specified event consumer')
@@ -243,7 +291,7 @@ logger.info(f"Consumer URL: {args.report_consumer_url}")
 logger.info(f"Consumer API key: {args.report_consumer_api_key}")
 
 if args.dry_run:
-    logger.info("RUNNING IN DRY-RUN MODE")
+    logger.info("RUNNING IN DRY-RUN MODE (not connecting/reporting to the DIS server)")
 else:
     dis_client = DisClient(api_key=args.report_consumer_api_key)
     dis_client_info = dis_client.get_info()
@@ -258,7 +306,7 @@ else:
     logger.info(f"Client type version: {client_type.get('version')}")
     # TODO: Check the maker (and version?)
 
-if not arbor_api_supported():
+if not check_sightline_api_supported():
     logger.error("Exiting due to lack of Arbor SP API support")
     exit(0)
 

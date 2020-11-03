@@ -18,9 +18,11 @@ fi
 function abs_path_for_file()
 {
     if [ $# -gt 0 ]; then
-        filepath=$*
-        abs_file=$( cd "${filepath%/*}" && pwd )"/"${filepath##*/}
-        echo "$abs_file"
+        if [ ! -z "$1" ]; then
+            filepath=$*
+            abs_file=$( cd "${filepath%/*}" && pwd )"/"${filepath##*/}
+            echo "$abs_file"
+        fi
     fi
 }
 
@@ -50,9 +52,11 @@ function print_usage()
     echo "     docker-run: Create and start the $shortname docker container"
     echo "     docker-run-interactive: Start a shell to run $shortname (for debugging)"
     echo "     docker-status: Show the status of the $shortname docker container"
+    echo "     docker-stop: Stop the $shortname docker container"
     echo "     docker-kill: Kill the $shortname docker container"
     echo "     docker-rm: Delete the $shortname docker container (can recreate with docker-run)"
     echo "     docker-restart: Restart the $shortname docker container"
+    echo "     docker-update: Kill the container, remove it, update, and restart"
     echo "     docker-logs: Show the logs for $shortname docker container"
     echo "     docker-trace: Watch the logs for the $shortname docker container"
     echo "     docker-address: Print the IP addresses for the $shortname docker container"
@@ -259,15 +263,20 @@ function docker-run-interactive()
 function docker-rm()
 {
     echo "Attempting to remove container \"$container_name\""
+    docker-kill
     $DOCKER_CMD container rm $container_name
+}
+
+function docker-stop()
+{
+    echo "Attempting to stop container \"$container_name\""
+    $DOCKER_CMD container stop $container_name
 }
 
 function docker-kill()
 {
-    echo "Attempting to kill and remove container \"$container_name\""
+    echo "Attempting to kill container \"$container_name\""
     $DOCKER_CMD container kill $container_name
-    sleep 1
-    docker-rm
 }
 
 function docker-restart()
@@ -279,7 +288,8 @@ function docker-restart()
 function docker-update()
 {
     echo "Attempting to update container image \"$container_name\""
-    docker-kill
+    docker-rm
+    sleep 1
     docker-pull
     docker-run
 }
