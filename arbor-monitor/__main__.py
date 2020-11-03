@@ -10,7 +10,7 @@ requests.packages.urllib3.disable_warnings()
 app = Quart(__name__)
 
 
-@app.route('/',methods=['POST'])
+@app.route('/dis/sl-webhook',methods=['POST'])
 async def process_sightline_webhook_notification():
     """
     This awaits data from Sightline and then parses it into an attack object.

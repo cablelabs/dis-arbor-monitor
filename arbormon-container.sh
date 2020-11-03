@@ -1,6 +1,8 @@
 #!/bin/bash
 
-set -e
+# Setting this will cause the script to terminate whenever a subprocess
+#  returns an error
+# set -e
 
 # Uncomment this on to debug the script
 # set -x
@@ -262,8 +264,8 @@ function docker-run-interactive()
 
 function docker-rm()
 {
-    echo "Attempting to remove container \"$container_name\""
     docker-kill
+    echo "Attempting to remove container \"$container_name\""
     $DOCKER_CMD container rm $container_name
 }
 
