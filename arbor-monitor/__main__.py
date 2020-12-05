@@ -1,4 +1,4 @@
-from quart import Quart,request
+from quart import Quart,request, jsonify
 import json, requests, logging, os, argparse, dateutil.parser, datetime
 from ipaddress import IPv4Address, IPv4Network
 from dis_client_sdk import DisClient
@@ -18,6 +18,12 @@ async def process_sightline_webhook_notification():
     query Sightline for the attack Source IPs and adds them to the attack object.
 
     """
+    if args.webhook_token:
+        token = request.args.get('token')
+        if args.webhook_token != token:
+            logger.warning(f"Webhook invoked with missing/invalid token (url requested: {request.url})")
+            return jsonify({"error": "token mismatch error"}), 404, {'Content-Type': 'application/json'}
+
     data = await request.data
     payload = json.loads(data)
     payload_data = payload["data"]
@@ -231,6 +237,11 @@ arg_parser.add_argument ('--bind-port', "-p", required=False, action='store', ty
                          default = os.environ.get('DIS_ARBORMON_BIND_PORT', 443),
                          help="specify the port to bind the HTTP/HTTPS server to for receiving "
                               "Arbor SP webhook notifications (or set DIS_ARBORMON_BIND_PORT)")
+arg_parser.add_argument ('--webhook-token', "-wt", required=False, action='store', type=str,
+                         default = os.environ.get('DIS_ARBORMON_WEBHOOK_TOKEN'),
+                         help="specify an optional token URI parameter the HTTP/HTTPS server will "
+                              "require for Arbor SP webhook notifications (e.g. /dis/sl-webhook&token=abcd)"
+                              "(or set DIS_ARBORMON_WEBHOOK_TOKEN)")
 arg_parser.add_argument ('--cert-chain-file', "-ccf", required=False, action='store', type=open,
                          default = os.environ.get('DIS_ARBORMON_CERT_FILE'),
                          help="the file path containing the certificate chain to use for the "
@@ -283,6 +294,7 @@ logger.info(f"Debug: {args.debug}")
 logger.info(f"Dry run: {args.dry_run}")
 logger.info(f"Bind address: {args.bind_address}")
 logger.info(f"Bind port: {args.bind_port}")
+logger.info(f"Webhook token: {args.webhook_token}")
 logger.info(f"Cert chain file: {cert_chain_filename}")
 logger.info(f"Cert key file: {cert_key_filename}")
 logger.info(f"Arbor API prefix: {args.arbor_api_prefix}")

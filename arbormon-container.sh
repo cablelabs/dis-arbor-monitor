@@ -75,6 +75,8 @@ function print_usage()
     echo "       (default \"$DEF_BIND_ADDRESS\")"
     echo "   [--bind-port <port to bind ${shortname} to>]"
     echo "       (default \"$DEF_BIND_PORT\")"
+    echo "   [--webhook-token <token to authenticate webhook notifications>]"
+    echo "       (default \"$DEF_WEBHOOK_TOKEN\")"
     echo "   [--tls-cert-chain-file <certificate chain file for HTTPS connections>]"
     echo "       (default \"$DEF_TLS_CERT_CHAIN_FILE\")"
     echo "   [--tls-priv-key <private key for for HTTPS connections>]"
@@ -104,6 +106,7 @@ function process_arguments()
     tls_priv_key_file=$(abs_path_for_file "$DEF_TLS_PRIV_KEY_FILE")
     bind_address="$DEF_BIND_ADDRESS"
     bind_port="$DEF_BIND_PORT"
+    webhook_token="$DEF_WEBHOOK_TOKEN"
     arbor_rest_api_prefix="$DEF_ARBOR_REST_API_PREFIX"
     arbor_rest_api_token="$DEF_ARBOR_REST_API_TOKEN"
     arbor_rest_api_insecure="$DEF_ARBOR_REST_API_INSECURE"
@@ -140,6 +143,10 @@ function process_arguments()
         elif [ "$opt_name" == "--bind-port" ]; then
             shift
             bind_port="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--webhook-token" ]; then
+            shift
+            webhook_token="$1"
             shift || bailout_with_usage "missing parameter to $opt_name"
         elif [ "$opt_name" == "--arbor-api-prefix" ]; then
             shift
@@ -183,6 +190,7 @@ function process_arguments()
         echo "tls_priv_key_file: $tls_priv_key_file"
         echo "bind_address: $bind_address"
         echo "bind_port: $bind_port"
+        echo "webhook_token: $webhook_token"
         echo "arbor_rest_api_prefix: $arbor_rest_api_prefix"
         echo "arbor_rest_api_token: $arbor_rest_api_token"
         echo "arbor_rest_api_insecure: $arbor_rest_api_insecure"
@@ -218,6 +226,10 @@ function docker-run()
         arbor_rest_api_insecure_opt="--arbor-api-insecure"
     fi
 
+    if [ ! -z "$webhook_token" ]; then
+        webhook_token_opt="--webhook-token $webhook_token"
+    fi
+
     if [ ! -z "$debug" ]; then
         debug_opt="--debug"
     fi
@@ -225,6 +237,7 @@ function docker-run()
     docker_run_params=(python3.6 /app/arbor-monitor
                               $debug_opt
                               --bind-port "$bind_port"
+                              $webhook_token_opt
                               --arbor-api-prefix "$arbor_rest_api_prefix"
                               --arbor-api-token "$arbor_rest_api_token"
                               $arbor_rest_api_insecure_opt
