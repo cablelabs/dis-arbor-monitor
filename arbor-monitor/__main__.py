@@ -229,54 +229,71 @@ arg_parser.add_argument ('--debug', "-d,", required=False, action='store_true',
 arg_parser.add_argument ('--dry-run', "-dr,", required=False, action='store_true',
                          default = os.environ.get('DIS_ARBORMON_DRY_RUN') == "True",
                          help="Enables a dry-tun test (doesn't upload to a server - just logs)")
-arg_parser.add_argument ('--bind-address', "-a", required=False, action='store', type=str,
+arg_parser.add_argument ('--bind-address', "-a", required=False, action='store',
+                         type=str, metavar="bind_address",
                          default=os.environ.get('DIS_ARBORMON_BIND_ADDRESS', "0.0.0.0"),
                          help="specify the address to bind the HTTP/HTTPS server to for receiving "
                               "Arbor SP webhook notifications (or set DIS_ARBORMON_BIND_ADDRESS)")
 arg_parser.add_argument ('--bind-port', "-p", required=False, action='store', type=int,
-                         default = os.environ.get('DIS_ARBORMON_BIND_PORT', 443),
+                         default = os.environ.get('DIS_ARBORMON_BIND_PORT', 443), metavar="bind_port",
                          help="specify the port to bind the HTTP/HTTPS server to for receiving "
                               "Arbor SP webhook notifications (or set DIS_ARBORMON_BIND_PORT)")
 arg_parser.add_argument ('--webhook-token', "-wt", required=False, action='store', type=str,
-                         default = os.environ.get('DIS_ARBORMON_WEBHOOK_TOKEN'),
+                         default = os.environ.get('DIS_ARBORMON_WEBHOOK_TOKEN'), metavar="token",
                          help="specify an optional token URI parameter the HTTP/HTTPS server will "
                               "require for Arbor SP webhook notifications (e.g. /dis/sl-webhook&token=abcd)"
                               "(or set DIS_ARBORMON_WEBHOOK_TOKEN)")
 arg_parser.add_argument ('--cert-chain-file', "-ccf", required=False, action='store', type=open,
-                         default = os.environ.get('DIS_ARBORMON_CERT_FILE'),
+                         default = os.environ.get('DIS_ARBORMON_CERT_FILE'), metavar="cert_file",
                          help="the file path containing the certificate chain to use for the "
                               "HTTPS server connection for receiving Arbor SP webhook notifications "
                               "(or set DIS_ARBORMON_CERT_FILE). If not set, only HTTP webhook "
                               "connections will be supported (HTTPS will be disabled).")
 arg_parser.add_argument ('--cert-key-file', "-ckf", required=False, action='store', type=open,
-                         default = os.environ.get('DIS_ARBORMON_KEY_FILE'),
+                         default = os.environ.get('DIS_ARBORMON_KEY_FILE'), metavar="cert_key_file",
                          help="the file path containing the key for the associated leaf certificate " 
                               "contained in the certificate chain file for the HTTPS server connection"
                               "for receiving Arbor SP webhook notification (or DIS_ARBORMON_KEY_FILE)")
 arg_default = os.environ.get('DIS_ARBORMON_REST_API_PREFIX')
-arg_parser.add_argument ('--arbor-api-prefix', "-aap,", required=not arg_default,
-                         action='store', type=str, default=arg_default,
+arg_parser.add_argument ('--arbor-api-prefix', "-aap", required=not arg_default,
+                         action='store', type=str, default=arg_default, metavar="url_prefix",
                          help="Specify the Arbor API prefix to use for REST calls "
                               "(e.g. 'https://arbor001.acme.com') "
                               "(or set DIS_ARBORMON_REST_API_PREFIX)")
 arg_default=os.environ.get('DIS_ARBORMON_REST_API_TOKEN')
 arg_parser.add_argument ('--arbor-api-token', "-aat,", required=not arg_default,
-                         action='store', type=str, default=arg_default,
+                         action='store', type=str, default=arg_default, metavar="api_token",
                          help="Specify the Arbor API token to use for REST calls "
                               "(or DIS_ARBORMON_REST_API_TOKEN)")
 arg_parser.add_argument ('--arbor-api-insecure', "-aai,", required=False,
                          action='store_true', default=False,
                          help="Disable cert checks when invoking Arbor SP API REST calls "
                               "(or DIS_ARBORMON_REST_API_INSECURE)")
-arg_parser.add_argument ('--report-consumer-url', "-rcu,", required=False, action='store', type=str,
-                         default = os.environ.get('DIS_ARBORMON_REPORT_CONSUMER_URL'),
-                         help="Specifies the API prefix to use for submitting attack reports"
-                              "(or DIS_ARBORMON_REPORT_CONSUMER_URL)")
+# arg_parser.add_argument ('--report-consumer-url', "-rcu,", required=False, action='store', type=str,
+#                          default = os.environ.get('DIS_ARBORMON_REPORT_CONSUMER_URL'),
+#                          help="Specifies the API prefix to use for submitting attack reports"
+#                               "(or DIS_ARBORMON_REPORT_CONSUMER_URL)")
 arg_default=os.environ.get('DIS_ARBORMON_REPORT_API_KEY')
 arg_parser.add_argument ('--report-consumer-api-key', "-rckey,", required=not arg_default,
-                         action='store', type=str, default=arg_default,
+                         action='store', type=str, default=arg_default, metavar="api_key",
                          help="Specify the API key to use for submitting attack reports "
                               "(or DIS_ARBORMON_REPORT_API_KEY)")
+arg_parser.add_argument ('--enable-periodic-reporting', "-epr", required=False, action='store',
+                         type=int, metavar="interval_seconds",
+                         default=os.environ.get('DIS_ARBORMON_PERIODIC_REPORT_SEC'),
+                         help="Enable info-level periodic reporting of attack/report statistics "
+                              "(or set DIS_ARBORMON_PERIODIC_REPORT_SEC)")
+arg_parser.add_argument ('--syslog-server', "-sl", required=False, action='store',
+                         type=str, metavar="server",
+                         default=os.environ.get('DIS_ARBORMON_SYSLOG_SERVER'),
+                         help="Specify a syslog server for logging error/info messages "
+                              "(or DIS_ARBORMON_SYSLOG_SERVER) in the format \"server\" "
+                              "or \"server:port\"")
+arg_parser.add_argument ('--store-report-to-dir', "-sdu", required=False, action='store',
+                         type=str, metavar="directory",
+                         default=os.environ.get('DIS_ARBORMON_REPORT_STORE_DIR'),
+                         help="Specify a directory to store generated json reports to "
+                              "(or DIS_ARBORMON_REPORT_STORE_DIR)")
 
 args = arg_parser.parse_args()
 
@@ -294,13 +311,16 @@ logger.info(f"Debug: {args.debug}")
 logger.info(f"Dry run: {args.dry_run}")
 logger.info(f"Bind address: {args.bind_address}")
 logger.info(f"Bind port: {args.bind_port}")
-logger.info(f"Webhook token: {args.webhook_token}")
+logger.info(f"Webhook token: ... ...{args.webhook_token[-5:]}")
 logger.info(f"Cert chain file: {cert_chain_filename}")
 logger.info(f"Cert key file: {cert_key_filename}")
 logger.info(f"Arbor API prefix: {args.arbor_api_prefix}")
-logger.info(f"Arbor API token: {args.arbor_api_token}")
+logger.info(f"Arbor API token: ... ...{args.arbor_api_token[-5:]}")
 logger.info(f"Consumer URL: {args.report_consumer_url}")
-logger.info(f"Consumer API key: {args.report_consumer_api_key}")
+logger.info(f"Consumer API key: ... ...{args.report_consumer_api_key[-5:]}")
+logger.info(f"Periodic reporting enabled: {args.enable_periodic_reporting}")
+logger.info(f"Syslog server: {args.syslog_server}")
+logger.info(f"Report storage directory: {args.store_report_to_dir}")
 
 if args.dry_run:
     logger.info("RUNNING IN DRY-RUN MODE (not connecting/reporting to the DIS server)")
