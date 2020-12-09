@@ -1,5 +1,5 @@
 from quart import Quart,request, jsonify
-import json, requests, logging, os, argparse, dateutil.parser, datetime
+import json, requests, logging, asyncio, os, argparse, dateutil.parser, time
 from ipaddress import IPv4Address, IPv4Network
 from dis_client_sdk import DisClient
 
@@ -9,7 +9,6 @@ requests.packages.urllib3.disable_warnings()
 
 app = Quart(__name__)
 
-
 @app.route('/dis/sl-webhook',methods=['POST'])
 async def process_sightline_webhook_notification():
     """
@@ -18,6 +17,9 @@ async def process_sightline_webhook_notification():
     query Sightline for the attack Source IPs and adds them to the attack object.
 
     """
+    global total_reports_sent
+    global total_source_ips_reported
+
     if args.webhook_token:
         token = request.args.get('token')
         if args.webhook_token != token:
@@ -85,6 +87,8 @@ async def process_sightline_webhook_notification():
             # TODO: Add accessor for the DIS client base URL
             logger.info(f"Attack ID {attack_id}: Sending report to DIS server")
             dis_client.send()
+            total_reports_sent += 1
+            total_source_ips_reported += len(source_ip_list)
             logger.info(f"Attack ID {attack_id}: Report sent to DIS server")
 
     return 'hello'
@@ -217,6 +221,20 @@ def add_source_ips_v2(dis_event, attack_id):
 
     return ip_list
 
+def start_status_reporting(report_interval_mins):
+    report_task = asyncio.get_event_loop().create_task(perform_periodic_status_reports(report_interval_mins))
+
+async def perform_periodic_status_reports(report_interval_mins):
+    logger.info("Performing status reporting every %s minutes", report_interval_mins)
+    while True:
+        pre_time = time.time()
+        pre_count_reports = total_reports_sent
+        pre_count_ips = total_source_ips_reported
+        await asyncio.sleep(report_interval_mins * 60)
+        time_delta = time.time() - pre_time
+        report_count_delta = total_reports_sent - pre_count_reports
+        ip_count_delta = total_source_ips_reported - pre_count_ips
+        logger.info(f"STATUS REPORT: Sent {report_count_delta} reports (with {ip_count_delta} source IPs) in {(time_delta/60):.3} minutes")
 
 # MAIN
 
@@ -278,11 +296,11 @@ arg_parser.add_argument ('--report-consumer-api-key', "-rckey,", required=not ar
                          action='store', type=str, default=arg_default, metavar="api_key",
                          help="Specify the API key to use for submitting attack reports "
                               "(or DIS_ARBORMON_REPORT_API_KEY)")
-arg_parser.add_argument ('--enable-periodic-reporting', "-epr", required=False, action='store',
-                         type=int, metavar="interval_seconds",
-                         default=os.environ.get('DIS_ARBORMON_PERIODIC_REPORT_SEC'),
+arg_parser.add_argument ('--periodic-reporting-interval', "-pri", required=False, action='store',
+                         type=int, metavar="interval_minutes",
+                         default=os.environ.get('DIS_ARBORMON_PERIODIC_REPORT_MINS'),
                          help="Enable info-level periodic reporting of attack/report statistics "
-                              "(or set DIS_ARBORMON_PERIODIC_REPORT_SEC)")
+                              "(or set DIS_ARBORMON_PERIODIC_REPORT_MINS)")
 arg_parser.add_argument ('--syslog-server', "-sl", required=False, action='store',
                          type=str, metavar="server",
                          default=os.environ.get('DIS_ARBORMON_SYSLOG_SERVER'),
@@ -311,14 +329,14 @@ logger.info(f"Debug: {args.debug}")
 logger.info(f"Dry run: {args.dry_run}")
 logger.info(f"Bind address: {args.bind_address}")
 logger.info(f"Bind port: {args.bind_port}")
-logger.info(f"Webhook token: ... ...{args.webhook_token[-5:]}")
+logger.info(f"Webhook token: ... ...{args.webhook_token[-4:]}")
 logger.info(f"Cert chain file: {cert_chain_filename}")
 logger.info(f"Cert key file: {cert_key_filename}")
 logger.info(f"Arbor API prefix: {args.arbor_api_prefix}")
-logger.info(f"Arbor API token: ... ...{args.arbor_api_token[-5:]}")
-logger.info(f"Consumer URL: {args.report_consumer_url}")
-logger.info(f"Consumer API key: ... ...{args.report_consumer_api_key[-5:]}")
-logger.info(f"Periodic reporting enabled: {args.enable_periodic_reporting}")
+logger.info(f"Arbor API token: ... ...{args.arbor_api_token[-4:]}")
+# logger.info(f"Consumer URL: {args.report_consumer_url}")
+logger.info(f"Consumer API key: ... ...{args.report_consumer_api_key[-4:]}")
+logger.info(f"Periodic reporting interval: {args.periodic_reporting_interval} minutes")
 logger.info(f"Syslog server: {args.syslog_server}")
 logger.info(f"Report storage directory: {args.store_report_to_dir}")
 
@@ -341,6 +359,12 @@ else:
 if not check_sightline_api_supported():
     logger.error("Exiting due to lack of Arbor SP API support")
     exit(0)
+
+total_reports_sent = 0
+total_source_ips_reported = 0
+
+if args.periodic_reporting_interval:
+    start_status_reporting(args.periodic_reporting_interval)
 
 app.run(debug=args.debug, host=args.bind_address, port=args.bind_port,
         certfile=cert_chain_filename, keyfile=cert_key_filename)
