@@ -1,11 +1,12 @@
 from quart import Quart,request, jsonify
-import json, requests, logging, asyncio, os, argparse, dateutil.parser, time
+import json, requests, logging, logging.handlers, socket, asyncio, os, argparse, dateutil.parser, time
 from ipaddress import IPv4Address, IPv4Network
 from dis_client_sdk import DisClient
 
-
 #disable Warning for SSL.
 requests.packages.urllib3.disable_warnings()
+
+default_log_prefix = "dis-arbor-sl-monitor"
 
 app = Quart(__name__)
 
@@ -31,7 +32,7 @@ async def process_sightline_webhook_notification():
     payload_data = payload["data"]
     attack_attributes = payload_data["attributes"]
     attack_id = payload_data.get("id")
-    logger.debug("Arbor notification payload:" + json.dumps(payload, indent=3))
+    logger.debug("Sightline notification payload:" + json.dumps(payload, indent=3))
 
     if attack_attributes["ongoing"]:
         logger.info(f"Received notification of ONGOING attack (ID: {attack_id})")
@@ -59,8 +60,8 @@ async def process_sightline_webhook_notification():
             logger.debug(f"Attack ID {attack_id}: Start/stop timestamp: {start_timestamp}/{stop_timestamp}")
 
             dis_event = dis_client.add_attack_event(start_timestamp=start_timestamp,
-                                                   end_timestamp=stop_timestamp,
-                                                   attack_type=attack_subobjects.get("misuse_types"))
+                                                    end_timestamp=stop_timestamp,
+                                                    attack_type=attack_subobjects.get("misuse_types"))
 
             # Add attributes to the attack event
             dis_client.add_attribute_to_event(event_uuid=dis_event,
@@ -225,7 +226,7 @@ def start_status_reporting(report_interval_mins):
     report_task = asyncio.get_event_loop().create_task(perform_periodic_status_reports(report_interval_mins))
 
 async def perform_periodic_status_reports(report_interval_mins):
-    logger.info("Performing status reporting every %s minutes", report_interval_mins)
+    logger.info(f"Performing status reporting every {report_interval_mins} minutes")
     while True:
         pre_time = time.time()
         pre_count_reports = total_reports_sent
@@ -301,12 +302,34 @@ arg_parser.add_argument ('--periodic-reporting-interval', "-pri", required=False
                          default=os.environ.get('DIS_ARBORMON_PERIODIC_REPORT_MINS'),
                          help="Enable info-level periodic reporting of attack/report statistics "
                               "(or set DIS_ARBORMON_PERIODIC_REPORT_MINS)")
-arg_parser.add_argument ('--syslog-server', "-sl", required=False, action='store',
+arg_parser.add_argument ('--syslog-server', "-slsu", required=False, action='store',
                          type=str, metavar="server",
                          default=os.environ.get('DIS_ARBORMON_SYSLOG_SERVER'),
-                         help="Specify a syslog server for logging error/info messages "
-                              "(or DIS_ARBORMON_SYSLOG_SERVER) in the format \"server\" "
-                              "or \"server:port\"")
+                         help="Specify a syslog server for logging error/info messages using UDP "
+                              "datagrams (or DIS_ARBORMON_SYSLOG_SERVER) in the format \"server\" "
+                              "or \"server:udp-port\"")
+arg_parser.add_argument ('--syslog-tcp-server', "-slst", required=False, action='store',
+                         type=str, metavar="server",
+                         default=os.environ.get('DIS_ARBORMON_SYSLOG_SERVER'),
+                         help="Specify a syslog server for logging error/info messages using a TCP "
+                              "connection (or DIS_ARBORMON_SYSLOG_SERVER) in the format \"server\" "
+                              "or \"server:udp-port\"")
+arg_parser.add_argument ('--syslog-socket', "-sls", required=False, action='store',
+                         type=str, metavar="socket_file",
+                         default=os.environ.get('DIS_ARBORMON_SYSLOG_SOCKET'),
+                         help="Specify a syslog named socket for logging error/info messages "
+                              "(or DIS_ARBORMON_SYSLOG_SOCKET)")
+arg_parser.add_argument ('--syslog-facility', "-slf", required=False, action='store',
+                         type=int, metavar="syslog_facility_code",
+                         default=os.environ.get('DIS_ARBORMON_SYSLOG_FACILITY',
+                                                logging.handlers.SysLogHandler.LOG_USER),
+                         help="Specify a syslog facility code for all syslog messages  "
+                              f"(or DIS_ARBORMON_SYSLOG_FACILITY). Default: LOG_USER")
+arg_parser.add_argument ('--log-prefix', "-lp", required=False, action='store',
+                         type=str, metavar="prefix_string",
+                         default=os.environ.get('DIS_ARBORMON_LOG_PREFIX', default_log_prefix),
+                         help="Specify a prefix string for logging error/info messages "
+                              "(or DIS_ARBORMON_SYSLOG_SOCKET)")
 arg_parser.add_argument ('--store-report-to-dir', "-sdu", required=False, action='store',
                          type=str, metavar="directory",
                          default=os.environ.get('DIS_ARBORMON_REPORT_STORE_DIR'),
@@ -320,7 +343,7 @@ logging_filemode=None
 logging.basicConfig (level=(logging.DEBUG if args.debug else logging.INFO),
                      filename=logging_filename, filemode=logging_filemode,
                      format='%(asctime)s %(name)s: %(levelname)s %(message)s')
-logger = logging.getLogger ('dis-arbor-monitor')
+logger = logging.getLogger(args.log_prefix)
 
 cert_chain_filename = args.cert_chain_file.name if args.cert_chain_file else None
 cert_key_filename = args.cert_key_file.name if args.cert_key_file else None
@@ -337,7 +360,9 @@ logger.info(f"Arbor API token: ... ...{args.arbor_api_token[-4:]}")
 # logger.info(f"Consumer URL: {args.report_consumer_url}")
 logger.info(f"Consumer API key: ... ...{args.report_consumer_api_key[-4:]}")
 logger.info(f"Periodic reporting interval: {args.periodic_reporting_interval} minutes")
-logger.info(f"Syslog server: {args.syslog_server}")
+logger.info(f"Syslog UDP server: {args.syslog_server}")
+logger.info(f"Syslog TCP server: {args.syslog_tcp_server}")
+logger.info(f"Syslog socket: {args.syslog_socket}")
 logger.info(f"Report storage directory: {args.store_report_to_dir}")
 
 if args.dry_run:
@@ -355,6 +380,55 @@ else:
     logger.info(f"Client type maker: {client_type.get('maker')}")
     logger.info(f"Client type version: {client_type.get('version')}")
     # TODO: Check the maker (and version?)
+
+# Note: Setting up syslog after logging above here - so the above doesn't go into syslog
+syslog_formatter = logging.Formatter("%(name)s: %(message)s")
+
+if args.syslog_server:
+    server_split = args.syslog_server.split(':')
+    if len(server_split) > 2:
+        logger.error(f"Error: The syslog hostname param cannot have more than one colon (found \"{args.syslog_server}\")")
+        exit(10)
+    try:
+        syslog_hostname = server_split[0]
+        if len(server_split) == 2:
+            syslog_port = int(server_split[1])
+        else:
+            syslog_port = logging.handlers.SYSLOG_UDP_PORT
+
+        syslog_handler = logging.handlers.SysLogHandler(address=(syslog_hostname, syslog_port),
+                                                        facility=args.syslog_facility,
+                                                        socktype=socket.SOCK_DGRAM)
+        logger.addHandler(syslog_handler)
+    except Exception as ex:
+        logger.info(f"Error creating datagram syslog handler for {args.syslog_server}: {ex}")
+        exit(11)
+
+if args.syslog_tcp_server:
+    server_split = args.syslog_tcp_server.split(':')
+    if len(server_split) != 2:
+        logger.error(f"Error: Expecting syslog TCP server option form server:port (found \"{args.syslog_tcp_server}\")")
+        exit(20)
+    try:
+        syslog_hostname = server_split[0]
+        syslog_port = int(server_split[1])
+        syslog_handler = logging.handlers.SysLogHandler(address=(syslog_hostname, syslog_port),
+                                                        facility=args.syslog_facility,
+                                                        socktype=socket.SOCK_STREAM)
+        logger.addHandler(syslog_handler)
+    except Exception as ex:
+        logger.info(f"Error creating syslog TCP handler for {args.syslog_tcp_server}: {ex}")
+        exit(21)
+
+if args.syslog_socket:
+    try:
+        syslog_handler = logging.handlers.SysLogHandler(address=args.syslog_socket,
+                                                        facility=args.syslog_facility)
+        syslog_handler.setFormatter(syslog_formatter)
+        logger.addHandler(syslog_handler)
+    except Exception as ex:
+        logger.info(f"Error creating syslog named socket handler for {args.syslog_socket}: {ex}")
+        exit(21)
 
 if not check_sightline_api_supported():
     logger.error("Exiting due to lack of Arbor SP API support")
