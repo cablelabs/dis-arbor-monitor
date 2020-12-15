@@ -58,11 +58,12 @@ async def process_sightline_webhook_notification():
         if args.dry_run:
             logger.info(f"Attack ID {attack_id}: Running in DRY RUN mode - not posting attack")
         else:
-            source_ip_list = send_report_to_dis_server(attack_id, payload, src_traffic_report)
+            # TODO: UNCOMMENT ME
+            # source_ip_list = send_report_to_dis_server(attack_id, payload, src_traffic_report)
             total_reports_sent += 1
-            total_source_ips_reported += len(source_ip_list)
+            # total_source_ips_reported += len(source_ip_list)
             if report_storage_path:
-                save_attack_report_file(report_storage_path, attack_id, src_traffic_report)
+                save_attack_report_file(report_storage_path, attack_id, payload, src_traffic_report)
 
     return f"Thank you Netscout (attack {attack_id})", 200, {'Content-Type': 'text/plain'}
 
@@ -183,7 +184,7 @@ def add_source_ips_v1(dis_event, attack_id):
     The list of source IPs added
 
     """
-    response = requests.get(f"{args.arbor_api_prefix}/api/sp/v6/alerts/{attack_id}/source_ip_addresses",
+    response = requests.get(f"{args.arbor_api_prefix}9934{attack_id}/source_ip_addresses",
                             verify=not args.arbor_api_insecure,
                             headers={"X-Arbux-APIToken":args.arbor_api_token})
     json_response = response.json()
@@ -239,7 +240,7 @@ def add_source_ips_v2(dis_client, dis_event, attack_id, src_traffic_report):
 
     return ip_list
 
-def save_attack_report_file(report_storage_path, attack_id, src_traffic_report):
+def save_attack_report_file(report_storage_path, attack_id, attack_payload, src_traffic_report):
     """
     Create an attack report file from a Arbor sightline traffic report
 
@@ -251,28 +252,41 @@ def save_attack_report_file(report_storage_path, attack_id, src_traffic_report):
     Returns:
         The JSON that was written to the file
     """
-    try:
-        src_ip_info = []
-        for data_elem in src_traffic_report['data']:
-            elem_id = "unknown"
-            try:
-                elem_id = data_elem['id']
-                logger.debug("Processing network src prefix " + elem_id)
-                bps_elem = data_elem['attributes']['view']['network']['unit']['bps']
-                elem_name = bps_elem['name']
-                elem_max_bps = bps_elem['max_value']
-                logger.debug(f"    name: {elem_name}, max bps: {elem_max_bps}")
-                net_addr = IPv4Network(elem_name, strict=True)
-                if net_addr.prefixlen != 32:
-                    logger.info(f"Attack {attack_id}: Network bitmask for {elem_id} is not 32 bits ({elem_name})")
-                else:
-                    ip_addr_str = str(net_addr.network_address)
-                    src_ip_info.append({ip_addr_str: {"max_bps": elem_max_bps}})
-            except Exception as ex:
-                logger.info(f"Error processing '{elem_id}': {ex}")
+    # TODO: REMOVE ME
+    logger.debug(f"save_attack_report_file: src_traffic_report: {src_traffic_report}")
 
-            report_filepath = report_storage_path.join(f"attack-src-report.{attack_id}.json")
-            with report_filepath.open('w') as reportfile:
+    src_ip_info = []
+    for data_elem in src_traffic_report['data']:
+        elem_id = "unknown"
+        try:
+            elem_id = data_elem['id']
+            logger.debug("Saving network src prefix " + elem_id)
+            bps_elem = data_elem['attributes']['view']['network']['unit']['bps']
+            elem_name = bps_elem['name']
+            elem_max_bps = bps_elem['max_value']
+            logger.debug(f"    name: {elem_name}, max bps: {elem_max_bps}")
+            net_addr = IPv4Network(elem_name, strict=True)
+            if net_addr.prefixlen != 32:
+                logger.info(f"Attack {attack_id}: Network bitmask for {elem_id} is not 32 bits ({elem_name}) - skipping")
+            else:
+                ip_addr_str = str(net_addr.network_address)
+                src_ip_info.append({"address": ip_addr_str, "max_bps": elem_max_bps})
+        except Exception as ex:
+            logger.info(f"Error saving '{elem_id}' to file: {ex}")
+
+    report_filepath = report_storage_path.joinpath(f"attack-src-report.{attack_id}.json")
+    attack_attributes = attack_payload.get("data").get("attributes")
+    attack_subobjects = attack_attributes.get("subobject")
+    start_time = attack_attributes.get("start_time")
+    stop_time = attack_attributes.get("stop_time")
+    impact_bps = attack_subobjects.get("impact_bps")
+    impact_pps = attack_subobjects.get("impact_pps")
+
+    with report_filepath.open('w') as reportfile:
+        attack_report = {"attributes": attack_attributes,
+                         "source_ips": src_ip_info}
+        json.dump(attack_report, reportfile, indent=4)
+        logger.info(f"Saved report on attack {attack_id} to {report_filepath.absolute()}")
 
 
 def start_status_reporting(report_interval_mins):
