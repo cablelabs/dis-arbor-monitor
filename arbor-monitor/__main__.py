@@ -30,42 +30,54 @@ async def process_sightline_webhook_notification():
 
     data = await request.data
     payload = json.loads(data)
-    payload_data = payload["data"]
-    attack_attributes = payload_data["attributes"]
-    attack_id = payload_data.get("id")
     logger.debug("Sightline notification payload:" + json.dumps(payload, indent=3))
 
+    payload_data = payload["data"]
+    attack_id = payload_data.get("id")
+
+    attack_attributes = payload_data["attributes"]
+    alert_class = attack_attributes.get("alert_class")
+    alert_type = attack_attributes.get("alert_type")
+
+    if not (alert_class == "dos" and alert_type == "dos_host_detection"):
+        logger.info(f"Received alert notification for a non-DOS attack - ignoring"
+                    f"(attack ID {attack_id} is a {alert_class}/{alert_type} alert)")
+        return f"Ignoring non-DOS attack report (attack {attack_id})", 200, {'Content-Type': 'text/plain'}
+
     if attack_attributes["ongoing"]:
-        logger.info(f"Received notification of ONGOING attack (ID: {attack_id})")
+        logger.info(f"Received notification of ONGOING attack (attack ID {attack_id})")
+        return f"Ignoring ongoing DOS attack report (attack {attack_id})", 200, {'Content-Type': 'text/plain'}
+
+    logger.info(f"Received notification of COMPLETED DOS attack (Attack ID: {attack_id})")
+
+    attack_subobjects = attack_attributes["subobject"]
+
+    start_time = attack_attributes.get("start_time")
+    stop_time = attack_attributes.get("stop_time")
+    misuse_types = attack_subobjects.get("misuse_types")
+    impact_bps = attack_subobjects.get("impact_bps")
+    impact_pps = attack_subobjects.get("impact_pps")
+
+    logger.info(f"Attack ID {attack_id}: Misuse Types: {misuse_types}")
+    logger.info(f"Attack ID {attack_id}: Start/stop time: {start_time}/{stop_time}")
+    logger.debug(f"Attack ID {attack_id}: Impact BPS: {impact_bps}")
+    logger.debug(f"Attack ID {attack_id}: Impact PPS: {impact_pps}")
+
+    src_traffic_report = get_src_traffic_report(attack_id)
+
+    if args.dry_run:
+        logger.info(f"Attack ID {attack_id}: Running in DRY RUN mode - not posting attack")
     else:
-        logger.info(f"Received notification of COMPLETED attack (Attack ID: {attack_id})")
+        source_ip_list = send_report_to_dis_server(attack_id, payload, src_traffic_report)
+        logger.info(f"Attack ID {attack_id}: Found {len(source_ip_list)} source IPs")
+        logger.info(f"Attack ID {attack_id}: First 50 source IPs: {source_ip_list[0:50]}")
+        total_reports_sent += 1
+        total_source_ips_reported += len(source_ip_list)
+        if report_storage_path:
+            save_attack_report_file(report_storage_path, args.report_store_format,
+                                    attack_id, payload, src_traffic_report)
 
-        attack_subobjects = attack_attributes["subobject"]
-
-        start_time = attack_attributes.get("start_time")
-        stop_time = attack_attributes.get("stop_time")
-        misuse_types = attack_subobjects.get("misuse_types")
-        impact_bps = attack_subobjects.get("impact_bps")
-        impact_pps = attack_subobjects.get("impact_pps")
-
-        logger.info(f"Attack ID {attack_id}: Misuse Types: {misuse_types}")
-        logger.info(f"Attack ID {attack_id}: Start/stop time: {start_time}/{stop_time}")
-        logger.debug(f"Attack ID {attack_id}: Impact BPS: {impact_bps}")
-        logger.debug(f"Attack ID {attack_id}: Impact PPS: {impact_pps}")
-
-        src_traffic_report = get_src_traffic_report(attack_id)
-
-        if args.dry_run:
-            logger.info(f"Attack ID {attack_id}: Running in DRY RUN mode - not posting attack")
-        else:
-            # TODO: UNCOMMENT ME
-            # source_ip_list = send_report_to_dis_server(attack_id, payload, src_traffic_report)
-            total_reports_sent += 1
-            # total_source_ips_reported += len(source_ip_list)
-            if report_storage_path:
-                save_attack_report_file(report_storage_path, attack_id, payload, src_traffic_report)
-
-    return f"Thank you Netscout (attack {attack_id})", 200, {'Content-Type': 'text/plain'}
+    return f"Thank you Netscout for the DOS report (attack ID {attack_id})", 200, {'Content-Type': 'text/plain'}
 
 def check_sightline_api_supported():
     """
@@ -111,6 +123,8 @@ def get_src_traffic_report(attack_id):
 
 def send_report_to_dis_server(attack_id, attack_payload, src_traffic_report):
     attack_attributes = attack_payload.get("data").get("attributes")
+
+
     attack_subobjects = attack_attributes.get("subobject")
     start_time = attack_attributes.get("start_time")
     stop_time = attack_attributes.get("stop_time")
@@ -141,9 +155,6 @@ def send_report_to_dis_server(attack_id, attack_payload, src_traffic_report):
 
     # Add the source address info from the report to the event
     source_ip_list = add_source_ips_v2(dis_client, dis_event, attack_id, src_traffic_report)
-
-    logger.info(f"Attack ID {attack_id}: Added {len(source_ip_list)} source IPs")
-    logger.info(f"Attack ID {attack_id}: Source IPs (first 50): {source_ip_list[0:50]}")
 
     staged_event_ids = dis_client.get_staged_event_ids()
     logger.info(f"Attack ID {attack_id}: Staged event IDs: {staged_event_ids}")
@@ -240,20 +251,21 @@ def add_source_ips_v2(dis_client, dis_event, attack_id, src_traffic_report):
 
     return ip_list
 
-def save_attack_report_file(report_storage_path, attack_id, attack_payload, src_traffic_report):
+
+def save_attack_report_file(report_storage_path, report_storage_format,
+                            attack_id, attack_payload, src_traffic_report):
     """
     Create an attack report file from a Arbor sightline traffic report
 
     Parameters:
         report_storage_path: The directory to store the report into
+        report_storage_format: "all-attributes" or "only-source-attributes
         attack_id: The Arbor Sightline attack ID
         src_traffic_report: The Arbor Sightline source traffic report
 
     Returns:
         The JSON that was written to the file
     """
-    # TODO: REMOVE ME
-    logger.debug(f"save_attack_report_file: src_traffic_report: {src_traffic_report}")
 
     src_ip_info = []
     for data_elem in src_traffic_report['data']:
@@ -276,18 +288,33 @@ def save_attack_report_file(report_storage_path, attack_id, attack_payload, src_
 
     report_filepath = report_storage_path.joinpath(f"attack-src-report.{attack_id}.json")
     attack_attributes = attack_payload.get("data").get("attributes")
-    attack_subobjects = attack_attributes.get("subobject")
+    attack_subobject = attack_attributes.get("subobject")
     start_time = attack_attributes.get("start_time")
     stop_time = attack_attributes.get("stop_time")
-    impact_bps = attack_subobjects.get("impact_bps")
-    impact_pps = attack_subobjects.get("impact_pps")
 
     with report_filepath.open('w') as reportfile:
-        attack_report = {"attributes": attack_attributes,
-                         "source_ips": src_ip_info}
+        attack_report = {"attack_id": attack_id,
+                         "start_time": start_time,
+                         "stop_time": stop_time,
+                         "source_ips": src_ip_info,
+                         "report-format": report_storage_format,
+                         "report-version": {"major": 1, "minor": 0}}
+        if report_storage_format == "all-attributes":
+            attributes = attack_subobject
+        elif report_storage_format == "only-source-attributes":
+            impact_bps = attack_subobject.get("impact_bps")
+            impact_pps = attack_subobject.get("impact_pps")
+            misuse_types = attack_subobject.get("misuse_types")
+            attributes = {"impact_bps": impact_bps,
+                          "impact_pps": impact_pps,
+                          "misuse_types": misuse_types}
+        else:
+            raise ValueError(f"Unknwn report_storage_format \"{report_storage_format}\"")
+
+        attack_report.update({"attributes": attributes})
+
         json.dump(attack_report, reportfile, indent=4)
         logger.info(f"Saved report on attack {attack_id} to {report_filepath.absolute()}")
-
 
 def start_status_reporting(report_interval_mins):
     report_task = asyncio.get_event_loop().create_task(perform_periodic_status_reports(report_interval_mins))
@@ -397,7 +424,13 @@ arg_parser.add_argument ('--log-report-stats', "-lrs", required=False, action='s
                          default=os.environ.get('DIS_ARBORMON_LOG_REPORT_STATS'),
                          help="Enable info-level periodic reporting of attack/report statistics "
                               "(or set DIS_ARBORMON_LOG_REPORT_STATS)")
-arg_parser.add_argument ('--store-reports-to-dir', "-sdu", required=False, action='store',
+storage_format_choices=["only-source-attributes","all-attributes"]
+arg_parser.add_argument ('--report-store-format', "-repf", required=False, action='store',
+                         type=str, metavar="format-name", choices=storage_format_choices,
+                         default=os.environ.get('DIS_ARBORMON_REPORT_STORE_FORMAT', "only-source-attributes"),
+                         help="Specify the report format to use when writing reports "
+                              f"(or DIS_ARBORMON_REPORT_STORE_FORMAT). One of {storage_format_choices}")
+arg_parser.add_argument ('--report-store-dir', "-repd", required=False, action='store',
                          type=str, metavar="dest-directory",
                          default=os.environ.get('DIS_ARBORMON_REPORT_STORE_DIR'),
                          help="Specify a directory to store generated json reports to "
@@ -430,7 +463,8 @@ logger.info(f"Periodic report stats logging interval: {args.log_report_stats} mi
 logger.info(f"Syslog UDP server: {args.syslog_server}")
 logger.info(f"Syslog TCP server: {args.syslog_tcp_server}")
 logger.info(f"Syslog socket: {args.syslog_socket}")
-logger.info(f"Report storage directory: {args.store_reports_to_dir}")
+logger.info(f"Report storage directory: {args.report_store_dir}")
+logger.info(f"Report storage format: {args.report_store_format}")
 
 if args.dry_run:
     logger.info("RUNNING IN DRY-RUN MODE (not connecting/reporting to the DIS server)")
@@ -497,13 +531,13 @@ if args.syslog_socket:
         logger.info(f"Error creating syslog named socket handler for {args.syslog_socket}: {ex}")
         exit(21)
 
-if args.store_reports_to_dir:
-    report_storage_path = Path(args.store_reports_to_dir)
+if args.report_store_dir:
+    report_storage_path = Path(args.report_store_dir)
     if not report_storage_path.is_dir():
-        logger.error(f"Error: The report storage path is not a directory (dest: \"{args.store_reports_to_dir}\")")
+        logger.error(f"Error: The report storage path is not a directory (dest: \"{args.report_store_dir}\")")
         exit(30)
     if not os.access(report_storage_path.absolute(), os.W_OK):
-        logger.error(f"Error: The report storage path is not writable (dest: \"{args.store_reports_to_dir}\")")
+        logger.error(f"Error: The report storage path is not writable (dest: \"{args.report_store_dir}\")")
         exit(30)
 
 if report_storage_path:
