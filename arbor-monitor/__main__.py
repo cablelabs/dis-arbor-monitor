@@ -67,12 +67,6 @@ async def process_sightline_webhook_notification():
                                               name="impact_pps", enum="PPS", value=impact_pps)
             dis_client.add_attribute_to_event(event_uuid=dis_event,
                                               name="local_attack_id", enum="BIGINT", value=attack_id)
-            dis_client.add_attribute_to_event(event_uuid=dis_event,
-                                              name="target_host_address", enum="IPV4",
-                                              value=attack_subobjects.get("host_address"))
-            dis_client.add_attribute_to_event(event_uuid=dis_event,
-                                              name="source_boundary", enum="STR",
-                                              value=attack_subobjects.get("impact_boundary"))
 
             # Add the source address info to the event
             source_ip_list = add_source_ips_v2(dis_event, attack_id)
