@@ -398,7 +398,7 @@ arg_parser.add_argument ('--arbor-api-token', "-aat,", required=not arg_default,
                          help="Specify the Arbor API token to use for REST calls "
                               "(or DIS_ARBORMON_REST_API_TOKEN)")
 arg_parser.add_argument ('--arbor-api-insecure', "-aai,", required=False,
-                         action='store_true', default=False,
+                         action='store_true', default=os.environ.get('DIS_ARBORMON_REST_API_INSECURE',False),
                          help="Disable cert checks when invoking Arbor SP API REST calls "
                               "(or DIS_ARBORMON_REST_API_INSECURE)")
 # arg_parser.add_argument ('--report-consumer-url', "-rcu,", required=False, action='store', type=str,
@@ -418,9 +418,9 @@ arg_parser.add_argument ('--syslog-server', "-slsu", required=False, action='sto
                               "or \"server:udp-port\"")
 arg_parser.add_argument ('--syslog-tcp-server', "-slst", required=False, action='store',
                          type=str, metavar="server",
-                         default=os.environ.get('DIS_ARBORMON_SYSLOG_SERVER'),
+                         default=os.environ.get('DIS_ARBORMON_SYSLOG_TCP_SERVER'),
                          help="Specify a syslog server for logging error/info messages using a TCP "
-                              "connection (or DIS_ARBORMON_SYSLOG_SERVER) in the format \"server\" "
+                              "connection (or DIS_ARBORMON_SYSLOG_TCP_SERVER) in the format \"server\" "
                               "or \"server:udp-port\"")
 arg_parser.add_argument ('--syslog-socket', "-sls", required=False, action='store',
                          type=str, metavar="socket_file",
@@ -443,17 +443,17 @@ arg_parser.add_argument ('--log-report-stats', "-lrs", required=False, action='s
                          default=os.environ.get('DIS_ARBORMON_LOG_REPORT_STATS'),
                          help="Enable info-level periodic reporting of attack/report statistics "
                               "(or set DIS_ARBORMON_LOG_REPORT_STATS)")
+arg_parser.add_argument ('--report-store-dir', "-repd", required=False, action='store',
+                         type=str, metavar="dest-directory",
+                         default=os.environ.get('DIS_ARBORMON_REPORT_STORE_DIR'),
+                         help="Specify a directory to store generated json reports to "
+                              "(or DIS_ARBORMON_REPORT_STORE_DIR)")
 storage_format_choices=["only-source-attributes","all-attributes"]
 arg_parser.add_argument ('--report-store-format', "-repf", required=False, action='store',
                          type=str, metavar="format-name", choices=storage_format_choices,
                          default=os.environ.get('DIS_ARBORMON_REPORT_STORE_FORMAT', "only-source-attributes"),
                          help="Specify the report format to use when writing reports "
                               f"(or DIS_ARBORMON_REPORT_STORE_FORMAT). One of {storage_format_choices}")
-arg_parser.add_argument ('--report-store-dir', "-repd", required=False, action='store',
-                         type=str, metavar="dest-directory",
-                         default=os.environ.get('DIS_ARBORMON_REPORT_STORE_DIR'),
-                         help="Specify a directory to store generated json reports to "
-                              "(or DIS_ARBORMON_REPORT_STORE_DIR)")
 
 args = arg_parser.parse_args()
 
@@ -560,7 +560,7 @@ if args.report_store_dir:
         exit(30)
 
 if report_storage_path:
-    logger.info(f"Saving attck source reports to \"{report_storage_path.absolute()}\")")
+    logger.info(f"Saving attack source reports to \"{report_storage_path.absolute()}\")")
 
 if not check_sightline_api_supported():
     logger.error("Exiting due to lack of Arbor SP API support")
