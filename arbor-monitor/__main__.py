@@ -18,6 +18,8 @@ async def process_sightline_webhook_notification():
     Once an attack has been finished (ie ongoing is False), the client will
     query Sightline for the attack Source IPs and adds them to the attack object.
 
+    Note: Returning a 4XX status code from this invocation can signal to Sightline
+          that the webhook needs to be reinvoked.
     """
     global total_reports_sent
     global total_source_ips_reported
@@ -40,7 +42,7 @@ async def process_sightline_webhook_notification():
     alert_type = attack_attributes.get("alert_type")
 
     if not (alert_class == "dos" and alert_type == "dos_host_detection"):
-        logger.info(f"Received alert notification for a non-DOS attack - ignoring"
+        logger.info(f"Ignoring alert regarding non-DOS attack "
                     f"(attack ID {attack_id} is a {alert_class}/{alert_type} alert)")
         return f"Ignoring non-DOS attack report (attack {attack_id})", 200, {'Content-Type': 'text/plain'}
 
@@ -48,7 +50,7 @@ async def process_sightline_webhook_notification():
         logger.info(f"Received notification of ONGOING attack (attack ID {attack_id})")
         return f"Ignoring ongoing DOS attack report (attack {attack_id})", 200, {'Content-Type': 'text/plain'}
 
-    logger.info(f"Received notification of COMPLETED DOS attack (Attack ID: {attack_id})")
+    logger.info(f"Processing notification of COMPLETED DOS attack (Attack ID: {attack_id})")
 
     attack_subobjects = attack_attributes["subobject"]
 
@@ -63,21 +65,40 @@ async def process_sightline_webhook_notification():
     logger.debug(f"Attack ID {attack_id}: Impact BPS: {impact_bps}")
     logger.debug(f"Attack ID {attack_id}: Impact PPS: {impact_pps}")
 
-    src_traffic_report = get_src_traffic_report(attack_id)
+    response = get_src_traffic_report(attack_id)
+    if response.status_code != 200:
+        msg=f"Error retrieving the source traffic report for attack {attack_id}: {response.reason} ({response.content}))"
+        logger.warning(msg)
+        return jsonify({"error": msg}), 404, {'Content-Type': 'application/json'}
+
+    src_traffic_report = response.json()
 
     if args.dry_run:
         logger.info(f"Attack ID {attack_id}: Running in DRY RUN mode - not posting attack")
     else:
-        source_ip_list = send_report_to_dis_server(attack_id, payload, src_traffic_report)
+        try:
+            source_ip_list = send_report_to_dis_server(attack_id, payload, src_traffic_report)
+        except Exception as ex:
+            msg = f"Caught an exception uploading the report for attack {attack_id} ({ex})"
+            logger.warning(msg, exc_info=ex)
+            return jsonify({"error": msg}), 404, {'Content-Type': 'application/json'}
+
         logger.info(f"Attack ID {attack_id}: Found {len(source_ip_list)} source IPs")
         logger.info(f"Attack ID {attack_id}: First 50 source IPs: {source_ip_list[0:50]}")
         total_reports_sent += 1
         total_source_ips_reported += len(source_ip_list)
         if report_storage_path:
-            save_attack_report_file(report_storage_path, args.report_store_format,
-                                    attack_id, payload, src_traffic_report)
+            try:
+                save_attack_report_file(report_storage_path, args.report_store_format,
+                                        attack_id, payload, src_traffic_report)
+            except Exception as ex:
+                msg = f"Caught an exception saving the report for attack {attack_id} ({ex}) - report uploaded, CONTINUING"
+                logger.warning(msg, exc_info=ex)
+                # Not returning a 400 here so Netscout doesn't keep attempting to redeliver this attack
+                #  notification (causing potential duplicate reports and backing up Netscout's notify queue)
+                return jsonify({"warning": msg}), 200, {'Content-Type': 'application/json'}
 
-    return f"Thank you Netscout for the DOS report (attack ID {attack_id})", 200, {'Content-Type': 'text/plain'}
+    return f"Thank you Netscout for the DOS report! (attack ID {attack_id})", 200, {'Content-Type': 'text/plain'}
 
 def check_sightline_api_supported():
     """
@@ -112,18 +133,16 @@ def check_sightline_api_supported():
 
 
 def get_src_traffic_report(attack_id):
-    # The default for this query is normally 5. So need to make sure to over-ride the default limit
+    # The default for this query is normally 5 source IPs. So need to make sure to over-ride the default limit
     prefix_query_limit=1000000
     response = requests.get(f"{args.arbor_api_prefix}/api/sp/v6/alerts/{attack_id}/traffic/src_prefixes/"
                             f"?query_unit=bps&query_limit={prefix_query_limit}&query_view=network",
                             verify=not args.arbor_api_insecure,
                             headers={"X-Arbux-APIToken":args.arbor_api_token})
-    return response.json()
-
+    return response
 
 def send_report_to_dis_server(attack_id, attack_payload, src_traffic_report):
     attack_attributes = attack_payload.get("data").get("attributes")
-
 
     attack_subobjects = attack_attributes.get("subobject")
     start_time = attack_attributes.get("start_time")
@@ -309,7 +328,7 @@ def save_attack_report_file(report_storage_path, report_storage_format,
                           "impact_pps": impact_pps,
                           "misuse_types": misuse_types}
         else:
-            raise ValueError(f"Unknwn report_storage_format \"{report_storage_format}\"")
+            raise ValueError(f"Unknown report_storage_format \"{report_storage_format}\"")
 
         attack_report.update({"attributes": attributes})
 
