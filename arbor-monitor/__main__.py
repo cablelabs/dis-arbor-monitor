@@ -2,6 +2,7 @@ from quart import Quart,request, jsonify
 import json, requests, logging, logging.handlers, socket, asyncio, os, argparse, dateutil.parser, time
 from ipaddress import IPv4Address, IPv4Network
 from dis_client_sdk import DisClient
+from pathlib import Path
 
 #disable Warning for SSL.
 requests.packages.urllib3.disable_warnings()
@@ -17,6 +18,8 @@ async def process_sightline_webhook_notification():
     Once an attack has been finished (ie ongoing is False), the client will
     query Sightline for the attack Source IPs and adds them to the attack object.
 
+    Note: Returning a 4XX status code from this invocation can signal to Sightline
+          that the webhook needs to be reinvoked.
     """
     global total_reports_sent
     global total_source_ips_reported
@@ -24,76 +27,78 @@ async def process_sightline_webhook_notification():
     if args.webhook_token:
         token = request.args.get('token')
         if args.webhook_token != token:
-            logger.warning(f"Webhook invoked with missing/invalid token (url requested: {request.url})")
+            logger.warning(f"Webhook invoked with missing/invalid token - IGNORING (url requested: {request.url})")
             return jsonify({"error": "token mismatch error"}), 404, {'Content-Type': 'application/json'}
 
     data = await request.data
     payload = json.loads(data)
-    payload_data = payload["data"]
-    attack_attributes = payload_data["attributes"]
-    attack_id = payload_data.get("id")
     logger.debug("Sightline notification payload:" + json.dumps(payload, indent=3))
 
+    payload_data = payload["data"]
+    attack_id = payload_data.get("id")
+
+    attack_attributes = payload_data["attributes"]
+    alert_class = attack_attributes.get("alert_class")
+    alert_type = attack_attributes.get("alert_type")
+
+    if not (alert_class == "dos" and alert_type == "dos_host_detection"):
+        logger.info(f"Ignoring alert regarding non-DOS attack "
+                    f"(attack ID {attack_id} is a {alert_class}/{alert_type} alert)")
+        return f"Ignoring non-DOS attack report (attack {attack_id})", 200, {'Content-Type': 'text/plain'}
+
     if attack_attributes["ongoing"]:
-        logger.info(f"Received notification of ONGOING attack (ID: {attack_id})")
+        logger.info(f"Received notification of ONGOING attack (attack ID {attack_id})")
+        return f"Ignoring ongoing DOS attack report (attack {attack_id})", 200, {'Content-Type': 'text/plain'}
+
+    logger.info(f"Processing notification of COMPLETED DOS attack (Attack ID: {attack_id})")
+
+    attack_subobjects = attack_attributes["subobject"]
+
+    start_time = attack_attributes.get("start_time")
+    stop_time = attack_attributes.get("stop_time")
+    misuse_types = attack_subobjects.get("misuse_types")
+    impact_bps = attack_subobjects.get("impact_bps")
+    impact_pps = attack_subobjects.get("impact_pps")
+
+    logger.info(f"Attack ID {attack_id}: Misuse Types: {misuse_types}")
+    logger.info(f"Attack ID {attack_id}: Start/stop time: {start_time}/{stop_time}")
+    logger.debug(f"Attack ID {attack_id}: Impact BPS: {impact_bps}")
+    logger.debug(f"Attack ID {attack_id}: Impact PPS: {impact_pps}")
+
+    response = get_src_traffic_report(attack_id)
+    if response.status_code != 200:
+        msg=f"Error retrieving the source traffic report for attack {attack_id}: {response.reason} ({response.content}))"
+        logger.warning(msg)
+        return jsonify({"error": msg}), 404, {'Content-Type': 'application/json'}
+
+    src_traffic_report = response.json()
+
+    if args.dry_run:
+        logger.info(f"Attack ID {attack_id}: Running in DRY RUN mode - not posting attack")
     else:
-        logger.info(f"Received notification of COMPLETED attack (Attack ID: {attack_id})")
+        try:
+            source_ip_list = send_report_to_dis_server(attack_id, payload, src_traffic_report)
+        except Exception as ex:
+            msg = f"Caught an exception uploading the report for attack {attack_id} ({ex})"
+            logger.warning(msg, exc_info=ex)
+            return jsonify({"error": msg}), 404, {'Content-Type': 'application/json'}
 
-        attack_subobjects = attack_attributes["subobject"]
+        logger.info(f"Attack ID {attack_id}: Found {len(source_ip_list)} source IPs")
+        logger.info(f"Attack ID {attack_id}: First 50 source IPs: {source_ip_list[0:50]}")
+        total_reports_sent += 1
+        total_source_ips_reported += len(source_ip_list)
+        if report_storage_path:
+            try:
+                save_attack_report_file(report_storage_path, args.report_store_format,
+                                        attack_id, payload, src_traffic_report)
+            except Exception as ex:
+                msg = f"Caught an exception saving the report for attack {attack_id} ({ex}) - report uploaded, CONTINUING"
+                logger.warning(msg, exc_info=ex)
+                # Not returning a 400 here so Netscout doesn't keep attempting to redeliver this attack
+                #  notification (causing potential duplicate reports and backing up Netscout's notify queue)
+                return jsonify({"warning": msg}), 200, {'Content-Type': 'application/json'}
 
-        start_time = attack_attributes.get("start_time")
-        stop_time = attack_attributes.get("stop_time")
-        misuse_types = attack_subobjects.get("misuse_types")
-        impact_bps = attack_subobjects.get("impact_bps")
-        impact_pps = attack_subobjects.get("impact_pps")
-
-        logger.info(f"Attack ID {attack_id}: Misuse Types: {misuse_types}")
-        logger.info(f"Attack ID {attack_id}: Start/stop time: {start_time}/{stop_time}")
-        logger.debug(f"Attack ID {attack_id}: Impact BPS: {impact_bps}")
-        logger.debug(f"Attack ID {attack_id}: Impact PPS: {impact_pps}")
-
-        if args.dry_run:
-            logger.info(f"Attack ID {attack_id}: Running in DRY RUN mode - not posting attack")
-        else:
-            start_timestamp = int(dateutil.parser.isoparse(start_time).timestamp())
-            stop_timestamp = int(dateutil.parser.isoparse(stop_time).timestamp())
-            logger.debug(f"Attack ID {attack_id}: Start/stop timestamp: {start_timestamp}/{stop_timestamp}")
-
-            dis_event = dis_client.add_attack_event(start_timestamp=start_timestamp,
-                                                    end_timestamp=stop_timestamp,
-                                                    attack_type=attack_subobjects.get("misuse_types"))
-
-            # Add attributes to the attack event
-            dis_client.add_attribute_to_event(event_uuid=dis_event,
-                                              name="impact_bps", enum="BPS", value=impact_bps)
-            dis_client.add_attribute_to_event(event_uuid=dis_event,
-                                              name="impact_pps", enum="PPS", value=impact_pps)
-            dis_client.add_attribute_to_event(event_uuid=dis_event,
-                                              name="local_attack_id", enum="BIGINT", value=attack_id)
-            dis_client.add_attribute_to_event(event_uuid=dis_event,
-                                              name="target_host_address", enum="IPV4",
-                                              value=attack_subobjects.get("host_address"))
-            dis_client.add_attribute_to_event(event_uuid=dis_event,
-                                              name="source_boundary", enum="STR",
-                                              value=attack_subobjects.get("impact_boundary"))
-
-            # Add the source address info to the event
-            source_ip_list = add_source_ips_v2(dis_event, attack_id)
-
-            logger.info(f"Attack ID {attack_id}: Added {len(source_ip_list)} source IPs")
-            logger.info(f"Attack ID {attack_id}: Source IPs (first 50): {source_ip_list[0:50]}")
-
-            staged_event_ids = dis_client.get_staged_event_ids()
-            logger.info(f"Attack ID {attack_id}: Staged event IDs: {staged_event_ids}")
-            # TODO: Add accessor for the DIS client base URL
-            logger.info(f"Attack ID {attack_id}: Sending report to DIS server")
-            dis_client.send()
-            total_reports_sent += 1
-            total_source_ips_reported += len(source_ip_list)
-            logger.info(f"Attack ID {attack_id}: Report sent to DIS server")
-
-    return 'hello'
-
+    return f"Thank you Netscout for the DOS report! (attack ID {attack_id})", 200, {'Content-Type': 'text/plain'}
 
 def check_sightline_api_supported():
     """
@@ -127,6 +132,58 @@ def check_sightline_api_supported():
     return True
 
 
+def get_src_traffic_report(attack_id):
+    # The default for this query is normally 5 source IPs. So need to make sure to over-ride the default limit
+    prefix_query_limit=1000000
+    response = requests.get(f"{args.arbor_api_prefix}/api/sp/v6/alerts/{attack_id}/traffic/src_prefixes/"
+                            f"?query_unit=bps&query_limit={prefix_query_limit}&query_view=network",
+                            verify=not args.arbor_api_insecure,
+                            headers={"X-Arbux-APIToken":args.arbor_api_token})
+    return response
+
+def send_report_to_dis_server(attack_id, attack_payload, src_traffic_report):
+    attack_attributes = attack_payload.get("data").get("attributes")
+
+    attack_subobjects = attack_attributes.get("subobject")
+    start_time = attack_attributes.get("start_time")
+    stop_time = attack_attributes.get("stop_time")
+    impact_bps = attack_subobjects.get("impact_bps")
+    impact_pps = attack_subobjects.get("impact_pps")
+
+    start_timestamp = int(dateutil.parser.isoparse(start_time).timestamp())
+    stop_timestamp = int(dateutil.parser.isoparse(stop_time).timestamp())
+    logger.debug(f"Attack ID {attack_id}: Start/stop timestamp: {start_timestamp}/{stop_timestamp}")
+
+    dis_event = dis_client.add_attack_event(start_timestamp=start_timestamp,
+                                            end_timestamp=stop_timestamp,
+                                            attack_type=attack_subobjects.get("misuse_types"))
+
+    # Add attributes to the attack event
+    dis_client.add_attribute_to_event(event_uuid=dis_event,
+                                      name="impact_bps", enum="BPS", value=impact_bps)
+    dis_client.add_attribute_to_event(event_uuid=dis_event,
+                                      name="impact_pps", enum="PPS", value=impact_pps)
+    dis_client.add_attribute_to_event(event_uuid=dis_event,
+                                      name="local_attack_id", enum="BIGINT", value=attack_id)
+    dis_client.add_attribute_to_event(event_uuid=dis_event,
+                                      name="target_host_address", enum="IPV4",
+                                      value=attack_subobjects.get("host_address"))
+    dis_client.add_attribute_to_event(event_uuid=dis_event,
+                                      name="source_boundary", enum="STR",
+                                      value=attack_subobjects.get("impact_boundary"))
+
+    # Add the source address info from the report to the event
+    source_ip_list = add_source_ips_v2(dis_client, dis_event, attack_id, src_traffic_report)
+
+    staged_event_ids = dis_client.get_staged_event_ids()
+    logger.info(f"Attack ID {attack_id}: Staged event IDs: {staged_event_ids}")
+    # TODO: Add accessor for the DIS client base URL so we can log it
+    logger.info(f"Attack ID {attack_id}: Sending report to DIS server")
+    dis_client.send()
+    logger.info(f"Attack ID {attack_id}: Report sent to DIS server")
+
+    return source_ip_list
+
 def send_event(event_object, post_url):
     """
     Sends event to consumer URL.
@@ -157,7 +214,7 @@ def add_source_ips_v1(dis_event, attack_id):
     The list of source IPs added
 
     """
-    response = requests.get(f"{args.arbor_api_prefix}/api/sp/v6/alerts/{attack_id}/source_ip_addresses",
+    response = requests.get(f"{args.arbor_api_prefix}9934{attack_id}/source_ip_addresses",
                             verify=not args.arbor_api_insecure,
                             headers={"X-Arbux-APIToken":args.arbor_api_token})
     json_response = response.json()
@@ -172,55 +229,111 @@ def add_source_ips_v1(dis_event, attack_id):
     return attack_source_ips
 
 
-def add_source_ips_v2(dis_event, attack_id):
+def add_source_ips_v2(dis_client, dis_event, attack_id, src_traffic_report):
     """
-    Makes a request to Arbor instance for the source IP that match the Attack ID:
+    Populate a DIS report from a Arbor sightline traffic report
 
     Parameters:
-    attack_id
-    dis_client
+        dis_event: The DIS event to populate with src data
+        src_traffic_report: The Arbor Sightline source traffic report
 
     Returns:
-
-    The list of source IPs added
+        An array containing the IP addresses that were added to the DIS report
 
     """
     ip_list=[]
-    # The default for this query is normally 5. So need to make sure to over-ride the default limit
-    prefix_query_limit=1000000
-    response = requests.get(f"{args.arbor_api_prefix}/api/sp/v6/alerts/{attack_id}/traffic/src_prefixes/"
-                            f"?query_unit=bps&query_limit={prefix_query_limit}&query_view=network",
-                            verify=not args.arbor_api_insecure,
-                            headers={"X-Arbux-APIToken":args.arbor_api_token})
-    json_response = response.json()
-    for data_elem in json_response['data']:
+    for data_elem in src_traffic_report['data']:
         elem_id = "unknown"
         try:
             elem_id = data_elem['id']
-            logger.debug("Processing network src prefix " + elem_id)
+            logger.debug(f"Attack {attack_id}: Processing network src prefix " + elem_id)
             bps_elem = data_elem['attributes']['view']['network']['unit']['bps']
             elem_name = bps_elem['name']
             elem_max_bps = bps_elem['max_value']
             logger.debug(f"    name: {elem_name}, max bps: {elem_max_bps}")
             net_addr = IPv4Network(elem_name, strict=True)
             if net_addr.prefixlen != 32:
-                logger.info(f"Skipping src prefix {elem_id}. Network bitmask is not 32 bits ({elem_name})")
+                logger.info(f"Attack {attack_id}: Network bitmask for {elem_id} is not 32 bits ({elem_name})")
             else:
                 ip_addr_str = str(net_addr.network_address)
-                if dis_client and dis_event:
-                    dis_client.add_attack_source_to_event(dis_event,
-                                                          ip=ip_addr_str,
-                                                          attribute_list=[
-                                                              {
-                                                                  "enum": "BPS",
-                                                                  "name": "Bytes per second",
-                                                                  "value": str(elem_max_bps)
-                                                              }])
+                dis_client.add_attack_source_to_event(dis_event,
+                                                      ip=ip_addr_str,
+                                                      attribute_list=[
+                                                          {
+                                                              "enum": "BPS",
+                                                              "name": "Bytes per second",
+                                                              "value": str(elem_max_bps)
+                                                          }])
                 ip_list.append(ip_addr_str)
         except Exception as ex:
             logger.info(f"Error processing '{elem_id}': {ex}")
 
     return ip_list
+
+
+def save_attack_report_file(report_storage_path, report_storage_format,
+                            attack_id, attack_payload, src_traffic_report):
+    """
+    Create an attack report file from a Arbor sightline traffic report
+
+    Parameters:
+        report_storage_path: The directory to store the report into
+        report_storage_format: "all-attributes" or "only-source-attributes
+        attack_id: The Arbor Sightline attack ID
+        src_traffic_report: The Arbor Sightline source traffic report
+
+    Returns:
+        The JSON that was written to the file
+    """
+
+    src_ip_info = []
+    for data_elem in src_traffic_report['data']:
+        elem_id = "unknown"
+        try:
+            elem_id = data_elem['id']
+            logger.debug("Saving network src prefix " + elem_id)
+            bps_elem = data_elem['attributes']['view']['network']['unit']['bps']
+            elem_name = bps_elem['name']
+            elem_max_bps = bps_elem['max_value']
+            logger.debug(f"    name: {elem_name}, max bps: {elem_max_bps}")
+            net_addr = IPv4Network(elem_name, strict=True)
+            if net_addr.prefixlen != 32:
+                logger.info(f"Attack {attack_id}: Network bitmask for {elem_id} is not 32 bits ({elem_name}) - skipping")
+            else:
+                ip_addr_str = str(net_addr.network_address)
+                src_ip_info.append({"address": ip_addr_str, "max_bps": elem_max_bps})
+        except Exception as ex:
+            logger.info(f"Error saving '{elem_id}' to file: {ex}")
+
+    report_filepath = report_storage_path.joinpath(f"attack-src-report.{attack_id}.json")
+    attack_attributes = attack_payload.get("data").get("attributes")
+    attack_subobject = attack_attributes.get("subobject")
+    start_time = attack_attributes.get("start_time")
+    stop_time = attack_attributes.get("stop_time")
+
+    with report_filepath.open('w') as reportfile:
+        attack_report = {"attack_id": attack_id,
+                         "start_time": start_time,
+                         "stop_time": stop_time,
+                         "source_ips": src_ip_info,
+                         "report-format": report_storage_format,
+                         "report-version": {"major": 1, "minor": 0}}
+        if report_storage_format == "all-attributes":
+            attributes = attack_subobject
+        elif report_storage_format == "only-source-attributes":
+            impact_bps = attack_subobject.get("impact_bps")
+            impact_pps = attack_subobject.get("impact_pps")
+            misuse_types = attack_subobject.get("misuse_types")
+            attributes = {"impact_bps": impact_bps,
+                          "impact_pps": impact_pps,
+                          "misuse_types": misuse_types}
+        else:
+            raise ValueError(f"Unknown report_storage_format \"{report_storage_format}\"")
+
+        attack_report.update({"attributes": attributes})
+
+        json.dump(attack_report, reportfile, indent=4)
+        logger.info(f"Saved report on attack {attack_id} to {report_filepath.absolute()}")
 
 def start_status_reporting(report_interval_mins):
     report_task = asyncio.get_event_loop().create_task(perform_periodic_status_reports(report_interval_mins))
@@ -285,7 +398,7 @@ arg_parser.add_argument ('--arbor-api-token', "-aat,", required=not arg_default,
                          help="Specify the Arbor API token to use for REST calls "
                               "(or DIS_ARBORMON_REST_API_TOKEN)")
 arg_parser.add_argument ('--arbor-api-insecure', "-aai,", required=False,
-                         action='store_true', default=False,
+                         action='store_true', default=os.environ.get('DIS_ARBORMON_REST_API_INSECURE',False),
                          help="Disable cert checks when invoking Arbor SP API REST calls "
                               "(or DIS_ARBORMON_REST_API_INSECURE)")
 # arg_parser.add_argument ('--report-consumer-url', "-rcu,", required=False, action='store', type=str,
@@ -305,9 +418,9 @@ arg_parser.add_argument ('--syslog-server', "-slsu", required=False, action='sto
                               "or \"server:udp-port\"")
 arg_parser.add_argument ('--syslog-tcp-server', "-slst", required=False, action='store',
                          type=str, metavar="server",
-                         default=os.environ.get('DIS_ARBORMON_SYSLOG_SERVER'),
+                         default=os.environ.get('DIS_ARBORMON_SYSLOG_TCP_SERVER'),
                          help="Specify a syslog server for logging error/info messages using a TCP "
-                              "connection (or DIS_ARBORMON_SYSLOG_SERVER) in the format \"server\" "
+                              "connection (or DIS_ARBORMON_SYSLOG_TCP_SERVER) in the format \"server\" "
                               "or \"server:udp-port\"")
 arg_parser.add_argument ('--syslog-socket', "-sls", required=False, action='store',
                          type=str, metavar="socket_file",
@@ -330,11 +443,17 @@ arg_parser.add_argument ('--log-report-stats', "-lrs", required=False, action='s
                          default=os.environ.get('DIS_ARBORMON_LOG_REPORT_STATS'),
                          help="Enable info-level periodic reporting of attack/report statistics "
                               "(or set DIS_ARBORMON_LOG_REPORT_STATS)")
-arg_parser.add_argument ('--store-report-to-dir', "-sdu", required=False, action='store',
-                         type=str, metavar="directory",
+arg_parser.add_argument ('--report-store-dir', "-repd", required=False, action='store',
+                         type=str, metavar="dest-directory",
                          default=os.environ.get('DIS_ARBORMON_REPORT_STORE_DIR'),
                          help="Specify a directory to store generated json reports to "
                               "(or DIS_ARBORMON_REPORT_STORE_DIR)")
+storage_format_choices=["only-source-attributes","all-attributes"]
+arg_parser.add_argument ('--report-store-format', "-repf", required=False, action='store',
+                         type=str, metavar="format-name", choices=storage_format_choices,
+                         default=os.environ.get('DIS_ARBORMON_REPORT_STORE_FORMAT', "only-source-attributes"),
+                         help="Specify the report format to use when writing reports "
+                              f"(or DIS_ARBORMON_REPORT_STORE_FORMAT). One of {storage_format_choices}")
 
 args = arg_parser.parse_args()
 
@@ -363,7 +482,8 @@ logger.info(f"Periodic report stats logging interval: {args.log_report_stats} mi
 logger.info(f"Syslog UDP server: {args.syslog_server}")
 logger.info(f"Syslog TCP server: {args.syslog_tcp_server}")
 logger.info(f"Syslog socket: {args.syslog_socket}")
-logger.info(f"Report storage directory: {args.store_report_to_dir}")
+logger.info(f"Report storage directory: {args.report_store_dir}")
+logger.info(f"Report storage format: {args.report_store_format}")
 
 if args.dry_run:
     logger.info("RUNNING IN DRY-RUN MODE (not connecting/reporting to the DIS server)")
@@ -429,6 +549,18 @@ if args.syslog_socket:
     except Exception as ex:
         logger.info(f"Error creating syslog named socket handler for {args.syslog_socket}: {ex}")
         exit(21)
+
+if args.report_store_dir:
+    report_storage_path = Path(args.report_store_dir)
+    if not report_storage_path.is_dir():
+        logger.error(f"Error: The report storage path is not a directory (dest: \"{args.report_store_dir}\")")
+        exit(30)
+    if not os.access(report_storage_path.absolute(), os.W_OK):
+        logger.error(f"Error: The report storage path is not writable (dest: \"{args.report_store_dir}\")")
+        exit(30)
+
+if report_storage_path:
+    logger.info(f"Saving attack source reports to \"{report_storage_path.absolute()}\")")
 
 if not check_sightline_api_supported():
     logger.error("Exiting due to lack of Arbor SP API support")
