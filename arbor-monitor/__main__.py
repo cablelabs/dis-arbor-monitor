@@ -297,11 +297,6 @@ arg_parser.add_argument ('--report-consumer-api-key', "-rckey,", required=not ar
                          action='store', type=str, default=arg_default, metavar="api_key",
                          help="Specify the API key to use for submitting attack reports "
                               "(or DIS_ARBORMON_REPORT_API_KEY)")
-arg_parser.add_argument ('--periodic-reporting-interval', "-pri", required=False, action='store',
-                         type=int, metavar="interval_minutes",
-                         default=os.environ.get('DIS_ARBORMON_PERIODIC_REPORT_MINS'),
-                         help="Enable info-level periodic reporting of attack/report statistics "
-                              "(or set DIS_ARBORMON_PERIODIC_REPORT_MINS)")
 arg_parser.add_argument ('--syslog-server', "-slsu", required=False, action='store',
                          type=str, metavar="server",
                          default=os.environ.get('DIS_ARBORMON_SYSLOG_SERVER'),
@@ -330,6 +325,11 @@ arg_parser.add_argument ('--log-prefix', "-lp", required=False, action='store',
                          default=os.environ.get('DIS_ARBORMON_LOG_PREFIX', default_log_prefix),
                          help="Specify a prefix string for logging error/info messages "
                               "(or DIS_ARBORMON_SYSLOG_SOCKET)")
+arg_parser.add_argument ('--log-report-stats', "-lrs", required=False, action='store',
+                         type=int, metavar="interval_minutes",
+                         default=os.environ.get('DIS_ARBORMON_LOG_REPORT_STATS'),
+                         help="Enable info-level periodic reporting of attack/report statistics "
+                              "(or set DIS_ARBORMON_LOG_REPORT_STATS)")
 arg_parser.add_argument ('--store-report-to-dir', "-sdu", required=False, action='store',
                          type=str, metavar="directory",
                          default=os.environ.get('DIS_ARBORMON_REPORT_STORE_DIR'),
@@ -359,7 +359,7 @@ logger.info(f"Arbor API prefix: {args.arbor_api_prefix}")
 logger.info(f"Arbor API token: ... ...{args.arbor_api_token[-4:]}")
 # logger.info(f"Consumer URL: {args.report_consumer_url}")
 logger.info(f"Consumer API key: ... ...{args.report_consumer_api_key[-4:]}")
-logger.info(f"Periodic reporting interval: {args.periodic_reporting_interval} minutes")
+logger.info(f"Periodic report stats logging interval: {args.log_report_stats} minutes")
 logger.info(f"Syslog UDP server: {args.syslog_server}")
 logger.info(f"Syslog TCP server: {args.syslog_tcp_server}")
 logger.info(f"Syslog socket: {args.syslog_socket}")
@@ -437,8 +437,8 @@ if not check_sightline_api_supported():
 total_reports_sent = 0
 total_source_ips_reported = 0
 
-if args.periodic_reporting_interval:
-    start_status_reporting(args.periodic_reporting_interval)
+if args.log_report_stats:
+    start_status_reporting(args.log_report_stats)
 
 app.run(debug=args.debug, host=args.bind_address, port=args.bind_port,
         certfile=cert_chain_filename, keyfile=cert_key_filename)
