@@ -89,7 +89,9 @@ function print_usage()
     echo "       (default \"$DEF_ARBOR_REST_API_INSECURE\")"
     echo "   [--report-consumer-api-key <API key for reporting>]"
     echo "       (default \"$DEF_REPORT_API_KEY\")"
-    echo "   [--periodic-report-min <Report stats every x min>]"
+    echo "   [--log-prefix <prefix in logs reported>]"
+    echo "       (default \"$DEF_LOG_PREFIX\")"
+    echo "   [--log-report-stats <Report stats every x min>]"
     echo "       (default \"$DEF_PERIODIC_REPORT_MINS\")"
     echo "   [--syslog-server <syslog (udp) server>]"
     echo "       (default \"$DEF_SYSLOG_SERVER\")"
@@ -97,7 +99,7 @@ function print_usage()
     echo "       (default \"$DEF_SYSLOG_TCP_SERVER\")"
     echo "   [--syslog-socket <syslog socket>]"
     echo "       (default \"$DEF_SYSLOG_SOCKET\")"
-    echo "   [--syslog-facility <syslog facility>]"
+    echo "   [--syslog-facility <numberic syslog facility>]"
     echo "       (default \"$DEF_SYSLOG_FACILITY\")"
     echo "   [--report-store-dir <store generated json>]"
     echo "       (default \"$DEF_REPORT_STORE_DIR\")"
@@ -123,7 +125,8 @@ function process_arguments()
     arbor_rest_api_token="$DEF_ARBOR_REST_API_TOKEN"
     arbor_rest_api_insecure="$DEF_ARBOR_REST_API_INSECURE"
     report_consumer_api_key="$DEF_REPORT_CONSUMER_API_KEY"
-    periodic_report_min="$DEF_PERIODIC_REPORT_MINS"
+    log_report_stats="$DEF_LOG_REPORT_STATS"
+    log_prefix="$DEF_LOG_PREFIX"
     syslog_server="$DEF_SYSLOG_SERVER"
     syslog_tcp_server="$DEF_SYSLOG_TCP_SERVER"
     syslog_socket="$DEF_SYSLOG_SOCKET"
@@ -182,9 +185,13 @@ function process_arguments()
             shift
             report_consumer_api_key="$1"
             shift || bailout_with_usage "missing parameter to $opt_name"
-        elif [ "$opt_name" == "--periodic-report-min" ]; then
+        elif [ "$opt_name" == "--log-prefix" ]; then
             shift
-            periodic_report_min="$1"
+            log_prefix="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--log-report-stats" ]; then
+            shift
+            log_report_stats="$1"
             shift || bailout_with_usage "missing parameter to $opt_name"
         elif [ "$opt_name" == "--syslog-server" ]; then
             shift
@@ -238,7 +245,7 @@ function process_arguments()
         echo "arbor_rest_api_token: $arbor_rest_api_token"
         echo "arbor_rest_api_insecure: $arbor_rest_api_insecure"
         echo "report_consumer_api_key: $report_consumer_api_key"
-        echo "periodic_report_min: $periodic_report_min"
+        echo "log_report_stats: $log_report_stats"
         echo "syslog_server: $syslog_server"
         echo "syslog_tcp_server: $syslog_tcp_server"
         echo "syslog_socket: $syslog_socket"
@@ -313,6 +320,9 @@ function docker-run()
 
     # Finally add the facility
     if [ ! -z "$syslog_facility" ]; then
+      if [ ! -z "${syslog_facility##[0-9]*}" ]; then
+        bailout "syslog facility must be numeric, see https://en.wikipedia.org/wiki/Syslog#Facility for corresponding number."  
+      fi
       syslog_command_args+=(--syslog-facility "$syslog_facility")
     fi
 
@@ -348,6 +358,8 @@ function docker-run()
                               --arbor-api-token "$arbor_rest_api_token"
                               $arbor_rest_api_insecure_opt
                               --report-consumer-api-key "$report_consumer_api_key"
+                              --log-prefix "$log_prefix"
+                              --log-report-stats "$log_report_stats"
                               "${cert_key_command_args[@]}"
                               "${syslog_command_args[@]}"
                               "${report_store_command_args[@]}"
