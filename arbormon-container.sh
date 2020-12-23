@@ -5,7 +5,7 @@
 # set -e
 
 # Uncomment this on to debug the script
-# set -x
+#set -x
 
 shortname="${0##*/}"
 longname="DIS arbor monitor"
@@ -87,10 +87,22 @@ function print_usage()
     echo "       (default \"$DEF_ARBOR_REST_API_TOKEN\")"
     echo "   [--arbor-api-insecure]"
     echo "       (default \"$DEF_ARBOR_REST_API_INSECURE\")"
-    echo "   [--report-consumer-url <url for posting report data>]"
-    echo "       (default \"$DEF_REPORT_CONSUMER_URL\")"
     echo "   [--report-consumer-api-key <API key for reporting>]"
     echo "       (default \"$DEF_REPORT_API_KEY\")"
+    echo "   [--periodic-report-min <Report stats every x min>]"
+    echo "       (default \"$DEF_PERIODIC_REPORT_MINS\")"
+    echo "   [--syslog-server <syslog (udp) server>]"
+    echo "       (default \"$DEF_SYSLOG_SERVER\")"
+    echo "   [--syslog-tcp-server <syslog tcp server>]"
+    echo "       (default \"$DEF_SYSLOG_TCP_SERVER\")"
+    echo "   [--syslog-socket <syslog socket>]"
+    echo "       (default \"$DEF_SYSLOG_SOCKET\")"
+    echo "   [--syslog-facility <syslog facility>]"
+    echo "       (default \"$DEF_SYSLOG_FACILITY\")"
+    echo "   [--report-store-dir <store generated json>]"
+    echo "       (default \"$DEF_REPORT_STORE_DIR\")"
+    echo "   [--report-store-format <only-source-attributes,all-attributes>]"
+    echo "       (default \"$DEF_REPORT_STORE_FORMAT\")"
 }
 
 function process_arguments()
@@ -112,6 +124,14 @@ function process_arguments()
     arbor_rest_api_insecure="$DEF_ARBOR_REST_API_INSECURE"
     report_consumer_url="$DEF_REPORT_CONSUMER_URL"
     report_consumer_api_key="$DEF_REPORT_CONSUMER_API_KEY"
+    periodic_report_min="$DEF_PERIODIC_REPORT_MINS"
+    syslog_server="$DEF_SYSLOG_SERVER"
+    syslog_tcp_server="$DEF_SYSLOG_TCP_SERVER"
+    syslog_socket="$DEF_SYSLOG_SOCKET"
+    syslog_facility="$DEF_SYSLOG_FACILITY"
+    report_store_dir="$DEF_REPORT_STORE_DIR"
+    report_store_format="$DEF_REPORT_STORE_FORMAT"
+    
     debug=
 
     while [[ $1 == --* ]]; do
@@ -159,13 +179,37 @@ function process_arguments()
         elif [ "$opt_name" == "--arbor-api-insecure" ]; then
             shift
             arbor_rest_api_insecure="True"
-        elif [ "$opt_name" == "--report-consumer-url" ]; then
-            shift
-            report_consumer_url="$1"
-            shift || bailout_with_usage "missing parameter to $opt_name"
         elif [ "$opt_name" == "--report-consumer-api-key" ]; then
             shift
             report_consumer_api_key="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--periodic-report-min" ]; then
+            shift
+            periodic_report_min="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--syslog-server" ]; then
+            shift
+            syslog_server="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--syslog-tcp-server" ]; then
+            shift
+            syslog_tcp_server="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--syslog-socket" ]; then
+            shift
+            syslog_socket="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--syslog-facility" ]; then
+            shift
+            syslog_facility="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--report-store-dir" ]; then
+            shift
+            report_store_dir="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--report-store-format" ]; then
+            shift
+            report_store_format="$1"
             shift || bailout_with_usage "missing parameter to $opt_name"
         elif [ "$opt_name" == "--debug" ]; then
             shift
@@ -196,6 +240,13 @@ function process_arguments()
         echo "arbor_rest_api_insecure: $arbor_rest_api_insecure"
         echo "report_consumer_url: $report_consumer_url"
         echo "report_consumer_api_key: $report_consumer_api_key"
+        echo "periodic_report_min: $periodic_report_min"
+        echo "syslog_server: $syslog_server"
+        echo "syslog_tcp_server: $syslog_tcp_server"
+        echo "syslog_socket: $syslog_socket"
+        echo "syslog_facility: $syslog_facility"
+        echo "report_store_dir: $report_store_dir"
+        echo "report_store_format: $report_store_format"
     fi
 }
 
@@ -215,6 +266,11 @@ function docker-run()
         bailout "Arbor rest API token not specified (use --arbor-api-token to specify)"
     fi
 
+    # Mounting the configuration file in the container as well
+    if [ -r $conf_file ]; then
+        conf_file_mount_args=(--mount type=bind,source="$conf_file",target=/app/lib/arbormon-container.conf,readonly)
+    fi
+
     if [ ! -z "$tls_cert_chain_file" -a ! -z "$tls_priv_key_file" ]; then
         cert_key_mount_args=(--mount type=bind,source="$tls_cert_chain_file",target=/app/lib/tls-cert-chain.pem,readonly
                              --mount type=bind,source="$tls_priv_key_file",target=/app/lib/tls-key.pem,readonly)
@@ -229,6 +285,58 @@ function docker-run()
     if [ ! -z "$webhook_token" ]; then
         webhook_token_opt="--webhook-token $webhook_token"
     fi
+    # Make syslog_server, syslog_tcp_server and syslog_socket mutually exclusive
+    # Slight ugliness here...
+    syslog_command_args=()
+    syslog_socket_mount_args=()
+    if [ ! -z "$syslog_server" ]; then
+      if [[ ! -z "$syslog_tcp_server" || ! -z "$syslog_socket" ]]; then
+        bailout "syslog server, tcp server and socket are mutually exclusive."
+      else
+        syslog_command_args=(--syslog-server "$syslog_server")
+      fi
+    fi
+    if [ ! -z "$syslog_tcp_server" ]; then
+      if [[ ! -z "$syslog_server" || ! -z "$syslog_socket" ]]; then
+       bailout "syslog tcp server, server and socket are mutually exclusive."
+      else
+        syslog_command_args=(--syslog-tcp-server "$syslog_tcp_server")
+      fi
+    fi
+    if [ ! -z "$syslog_socket" ]; then
+      if [[ ! -z "$syslog_server" || ! -z "$syslog_tcp_server" ]]; then
+        bailout "syslog socket, server and  tcp server are mutually exclusive."
+      else
+        # Assuming log socket identical in and outside of container
+        syslog_command_args=(--syslog-socket "$syslog_socket")
+        syslog_socket_mount_args=(--mount type=bind,source="$syslog_socket",target="$syslog_socket")
+      fi
+    fi
+
+    # Finally add the facility
+    if [ ! -z "$syslog_facility" ]; then
+      syslog_command_args+=(--syslog-facility "$syslog_facility")
+    fi
+
+    # check and mount the report store dir
+    if [ ! -z "$report_store_dir" ]; then
+      # directory exits?
+      if [ -d "$report_store_dir" ]; then
+        # directory writable
+        if [ -w "$report_store_dir" ]; then
+          report_store_mount_args=(--mount type=bind,source="$report_store_dir",target=/var/jsonstore)
+          report_store_command_args=(--report-store-dir /var/jsonstore)
+        fi
+      fi
+    fi
+    # Check value of report-store-format
+    if [ ! -z "$report_store_format" ];then
+      if [[ "$report_store_format" != "only-source-attributes" && "$report_store_format" != "all-attributes" ]];then
+        bailout "report-store-format can only be set to \"only-source-attributes\" or \"all-attributes\"."
+      else
+        report_format_command_args=(--report-store-format "$report_store_format")
+      fi
+    fi
 
     if [ ! -z "$debug" ]; then
         debug_opt="--debug"
@@ -241,9 +349,13 @@ function docker-run()
                               --arbor-api-prefix "$arbor_rest_api_prefix"
                               --arbor-api-token "$arbor_rest_api_token"
                               $arbor_rest_api_insecure_opt
-                              --report-consumer-url "$report_consumer_url"
                               --report-consumer-api-key "$report_consumer_api_key"
-                              "${cert_key_command_args[@]}")
+                              "${cert_key_command_args[@]}"
+                              "${syslog_command_args[@]}"
+                              "${report_store_command_args[@]}"
+                              "${report_format_command_args[@]}")
+
+    
     exec_options=(--read-only -d --restart unless-stopped)
 
     if [ "$1" == "interactive" ]; then
@@ -264,8 +376,13 @@ function docker-run()
         --name "$container_name" \
         -p "$bind_address:$bind_port:$bind_port" \
         "${cert_key_mount_args[@]}" \
+        "${conf_file_mount_args[@]}" \
+        "${report_store_mount_args[@]}" \
+        "${syslog_socket_mount_args[@]}" \
         "$docker_image_id:$docker_image_tag" \
-        "${docker_run_params[@]}"
+        "${docker_run_params[@]}" \
+
+
 }
 
 function docker-run-interactive()
