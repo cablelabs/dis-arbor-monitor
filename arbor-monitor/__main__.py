@@ -1,5 +1,5 @@
 from quart import Quart,request, jsonify
-import json, requests, logging, logging.handlers, socket, asyncio, os, argparse, dateutil.parser, time
+import json, requests, logging, logging.handlers, socket, asyncio, os, argparse, dateutil.parser, time, setproctitle
 from ipaddress import IPv4Address, IPv4Network
 from dis_client_sdk import DisClient
 from pathlib import Path
@@ -571,6 +571,11 @@ total_source_ips_reported = 0
 
 if args.log_report_stats:
     start_status_reporting(args.log_report_stats)
+
+# Ready to run, now hide command line arguments and change my process name
+# for easier monitoring and hide api keys from cli. Not 100% failsafe but
+# ok-ish
+setproctitle.setproctitle(args.log_prefix)
 
 app.run(debug=args.debug, host=args.bind_address, port=args.bind_port,
         certfile=cert_chain_filename, keyfile=cert_key_filename)
