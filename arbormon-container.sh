@@ -71,6 +71,10 @@ function print_usage()
     echo "       (default \"$DEF_IMAGE_TAG\")"
     echo "   [--docker-name <docker name to assign>]"
     echo "       (default \"$DEF_CONTAINER_NAME\")"
+    echo "   [--docker-as-user <user name to run container as>]"
+    echo "       (default \"$DEF_DOCKER_AS_USER\")"
+    echo "   [--docker-as-group <group name to run container as>]"
+    echo "       (default \"$DEF_DOCKER_AS_GROUP\")"
     echo "   [--bind-address <address to bind ${shortname} to>]"
     echo "       (default \"$DEF_BIND_ADDRESS\")"
     echo "   [--bind-port <port to bind ${shortname} to>]"
@@ -133,6 +137,8 @@ function process_arguments()
     syslog_facility="$DEF_SYSLOG_FACILITY"
     report_store_dir="$DEF_REPORT_STORE_DIR"
     report_store_format="$DEF_REPORT_STORE_FORMAT"
+    docker_as_user="$DEF_DOCKER_AS_USER"
+    docker_as_group="$DEF_DOCKER_AS_GROUP"
     
     debug=
 
@@ -149,6 +155,14 @@ function process_arguments()
         elif [ "$opt_name" == "--docker-name" ]; then
             shift
             container_name="$opt_name"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--docker-as-user" ]; then
+            shift
+            docker_as_user="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--docker-as-group" ]; then
+            shift
+            docker_as_group="$1"
             shift || bailout_with_usage "missing parameter to $opt_name"
         elif [ "$opt_name" == "--tls-cert-chain-file" ]; then
             shift
@@ -235,6 +249,8 @@ function process_arguments()
     if [ ! -z $debug ]; then
         echo "docker_image_id: $docker_image_id"
         echo "docker_image_tag: $docker_image_tag"
+        echo "docker_as_user: $docker_as_user"
+        echo "docker_as_group: $docker_as_group"
         echo "container_name: $container_name"
         echo "tls_cert_chain_file: $tls_cert_chain_file"
         echo "tls_priv_key_file: $tls_priv_key_file"
@@ -346,6 +362,25 @@ function docker-run()
       fi
     fi
 
+    user_command_args=()    
+    if [ ! -z "$docker_as_user" ];then
+      as_user=$(id -u "$docker_as_user")
+      if [ $? -ne 0 ] ; then
+        bailout "Run as user not found."
+      fi
+      user_command_args=(--user "$as_user":)
+    fi
+    if [ ! -z "$docker_as_group" ];then
+      if [ -z "$docker_as_user" ];then
+        bailout "Setting run as group without the user not possible."
+      fi
+      as_group=$(getent group "$docker_as_group" | awk -F\: '{print $3}')
+      if [ $? -ne 0 ] ; then
+        bailout "Run as group not found."
+      fi
+      user_command_args=(--user "$as_user":"$as_group")
+    fi
+
     if [ ! -z "$debug" ]; then
         debug_opt="--debug"
     fi
@@ -383,6 +418,7 @@ function docker-run()
 
     echo "Starting container \"$container_name\" from $docker_image_id:$docker_image_tag (on $bind_address:$bind_port)"
     $DOCKER_CMD run "${exec_options[@]}" \
+        "${user_command_args[@]}" \
         --name "$container_name" \
         -p "$bind_address:$bind_port:$bind_port" \
         "${cert_key_mount_args[@]}" \
