@@ -93,21 +93,21 @@ function print_usage()
     echo "       (default \"$DEF_ARBOR_REST_API_INSECURE\")"
     echo "   [--report-consumer-api-key <API key for reporting>]"
     echo "       (default \"$DEF_REPORT_API_KEY\")"
-    echo "   [--log-prefix <prefix in logs reported>]"
+    echo "   [--syslog-server <syslog UDP server or server:port>]"
+    echo "       (default \"$DEF_SYSLOG_SERVER\")"
+    echo "   [--syslog-tcp-server <syslog TCP server or server:port>]"
+    echo "       (default \"$DEF_SYSLOG_TCP_SERVER\")"
+    echo "   [--syslog-socket <syslog socket file>]"
+    echo "       (default \"$DEF_SYSLOG_SOCKET\")"
+    echo "   [--syslog-facility <syslog numeric facility code>]"
+    echo "       (default \"$DEF_SYSLOG_FACILITY\")"
+    echo "   [--log-prefix <log prefix string>]"
     echo "       (default \"$DEF_LOG_PREFIX\")"
     echo "   [--log-report-stats <Report stats every x min>]"
     echo "       (default \"$DEF_PERIODIC_REPORT_MINS\")"
-    echo "   [--syslog-server <syslog (udp) server>]"
-    echo "       (default \"$DEF_SYSLOG_SERVER\")"
-    echo "   [--syslog-tcp-server <syslog tcp server>]"
-    echo "       (default \"$DEF_SYSLOG_TCP_SERVER\")"
-    echo "   [--syslog-socket <syslog socket>]"
-    echo "       (default \"$DEF_SYSLOG_SOCKET\")"
-    echo "   [--syslog-facility <numberic syslog facility>]"
-    echo "       (default \"$DEF_SYSLOG_FACILITY\")"
-    echo "   [--report-store-dir <store generated json>]"
+    echo "   [--report-store-dir <report directory>]"
     echo "       (default \"$DEF_REPORT_STORE_DIR\")"
-    echo "   [--report-store-format <only-source-attributes,all-attributes>]"
+    echo "   [--report-store-format <"only-source-attributes"|"all-attributes">]"
     echo "       (default \"$DEF_REPORT_STORE_FORMAT\")"
 }
 
@@ -139,8 +139,7 @@ function process_arguments()
     report_store_format="$DEF_REPORT_STORE_FORMAT"
     docker_as_user="$DEF_DOCKER_AS_USER"
     docker_as_group="$DEF_DOCKER_AS_GROUP"
-    
-    debug=
+    debug="$DEF_DEBUG"
 
     while [[ $1 == --* ]]; do
         opt_name=$1
@@ -234,6 +233,38 @@ function process_arguments()
         elif [ "$opt_name" == "--debug" ]; then
             shift
             debug=true
+        elif [ "$opt_name" == "--syslog-server" ]; then
+            shift
+            syslog_server="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--syslog-tcp-server" ]; then
+            shift
+            syslog_tcp_server="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--syslog-socket" ]; then
+            shift
+            syslog_socket="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--syslog-facility" ]; then
+            shift
+            syslog_facility="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--log-prefix" ]; then
+            shift
+            log_prefix="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--log-report-stats" ]; then
+            shift
+            log_report_stats="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--report-store-dir" ]; then
+            shift
+            report_store_dir="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--report-store-format " ]; then
+            shift
+            report_store_format="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
         else
             bailout_with_usage "Unrecognized option: $opt_name"
         fi
@@ -268,6 +299,8 @@ function process_arguments()
         echo "syslog_facility: $syslog_facility"
         echo "report_store_dir: $report_store_dir"
         echo "report_store_format: $report_store_format"
+        echo "log_prefix: $log_prefix"
+        echo "debug: $debug"
     fi
 }
 

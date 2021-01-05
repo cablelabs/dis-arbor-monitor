@@ -437,7 +437,7 @@ arg_parser.add_argument ('--log-prefix', "-lp", required=False, action='store',
                          type=str, metavar="prefix_string",
                          default=os.environ.get('DIS_ARBORMON_LOG_PREFIX', default_log_prefix),
                          help="Specify a prefix string for logging error/info messages "
-                              "(or DIS_ARBORMON_SYSLOG_SOCKET)")
+                              "(or DIS_ARBORMON_LOG_PREFIX)")
 arg_parser.add_argument ('--log-report-stats', "-lrs", required=False, action='store',
                          type=int, metavar="interval_minutes",
                          default=os.environ.get('DIS_ARBORMON_LOG_REPORT_STATS'),
