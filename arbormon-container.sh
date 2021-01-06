@@ -320,11 +320,6 @@ function docker-run()
         bailout "Arbor rest API token not specified (use --arbor-api-token to specify)"
     fi
 
-    # Mounting the configuration file in the container as well
-    if [ -r $conf_file ]; then
-        conf_file_mount_args=(--mount type=bind,source="$conf_file",target=/app/lib/arbormon-container.conf,readonly)
-    fi
-
     if [ ! -z "$tls_cert_chain_file" -a ! -z "$tls_priv_key_file" ]; then
         cert_key_mount_args=(--mount type=bind,source="$tls_cert_chain_file",target=/app/lib/tls-cert-chain.pem,readonly
                              --mount type=bind,source="$tls_priv_key_file",target=/app/lib/tls-key.pem,readonly)
@@ -455,13 +450,10 @@ function docker-run()
         --name "$container_name" \
         -p "$bind_address:$bind_port:$bind_port" \
         "${cert_key_mount_args[@]}" \
-        "${conf_file_mount_args[@]}" \
         "${report_store_mount_args[@]}" \
         "${syslog_socket_mount_args[@]}" \
         "$docker_image_id:$docker_image_tag" \
-        "${docker_run_params[@]}" \
-
-
+        "${docker_run_params[@]}"
 }
 
 function docker-run-interactive()

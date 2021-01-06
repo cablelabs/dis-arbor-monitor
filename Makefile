@@ -1,5 +1,5 @@
 DOCKER_REGISTRY := community.cablelabs.com:4567
-DOCKER_IMAGE_TAG := dissarm
+DOCKER_IMAGE_TAG := reporting-test
 DOCKER_IMAGE_PATH := dis-docker/dis-arbor-monitor:$(DOCKER_IMAGE_TAG)
 DOCKER_SAVE_FILE := dis-arbor-monitor-$(DOCKER_IMAGE_TAG)
 
