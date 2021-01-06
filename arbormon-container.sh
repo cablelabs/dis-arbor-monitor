@@ -253,10 +253,6 @@ function process_arguments()
             shift
             log_prefix="$1"
             shift || bailout_with_usage "missing parameter to $opt_name"
-        elif [ "$opt_name" == "--log-report-stats" ]; then
-            shift
-            log_report_stats="$1"
-            shift || bailout_with_usage "missing parameter to $opt_name"
         elif [ "$opt_name" == "--report-store-dir" ]; then
             shift
             report_store_dir="$1"
@@ -370,6 +366,14 @@ function docker-run()
       syslog_command_args+=(--syslog-facility "$syslog_facility")
     fi
 
+    if [ ! -z "$log_report_stats" ]; then
+        log_report_opt="--log-report-stats $log_report_stats"
+    fi
+
+    if [ ! -z "$log_prefix" ]; then
+        log_prefix_opt="--log-prefix $log_prefix"
+    fi
+
     # check and mount the report store dir
     if [ ! -z "$report_store_dir" ]; then
       # directory exits?
@@ -421,8 +425,8 @@ function docker-run()
                               --arbor-api-token "$arbor_rest_api_token"
                               $arbor_rest_api_insecure_opt
                               --report-consumer-api-key "$report_consumer_api_key"
-                              --log-prefix "$log_prefix"
-                              --log-report-stats "$log_report_stats"
+                              $log_prefix_opt
+                              $log_report_opt
                               "${cert_key_command_args[@]}"
                               "${syslog_command_args[@]}"
                               "${report_store_command_args[@]}"
