@@ -558,9 +558,6 @@ if args.report_store_dir:
         logger.error(f"Error: The report storage path is not writable (dest: \"{args.report_store_dir}\")")
         exit(30)
 
-if report_storage_path:
-    logger.info(f"Saving attack source reports to \"{report_storage_path.absolute()}\")")
-
 if not check_sightline_api_supported():
     logger.error("Exiting due to lack of Arbor SP API support")
     exit(0)
