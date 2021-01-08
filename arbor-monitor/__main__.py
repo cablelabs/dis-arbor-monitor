@@ -23,6 +23,7 @@ async def process_sightline_webhook_notification():
     """
     global total_reports_sent
     global total_source_ips_reported
+    global report_storage_path
 
     if args.webhook_token:
         token = request.args.get('token')
@@ -557,6 +558,8 @@ if args.report_store_dir:
     if not os.access(report_storage_path.absolute(), os.W_OK):
         logger.error(f"Error: The report storage path is not writable (dest: \"{args.report_store_dir}\")")
         exit(30)
+else:
+    report_storage_path = None
 
 if not check_sightline_api_supported():
     logger.error("Exiting due to lack of Arbor SP API support")
