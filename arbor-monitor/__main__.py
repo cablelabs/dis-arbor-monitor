@@ -477,7 +477,7 @@ logger.info(f"Cert chain file: {cert_chain_filename}")
 logger.info(f"Cert key file: {cert_key_filename}")
 logger.info(f"Arbor API prefix: {args.arbor_api_prefix}")
 logger.info(f"Arbor API token: ... ...{args.arbor_api_token[-4:] if args.arbor_api_token else ''}")
-logger.info(f"Consumer API key: ... ...{args.report_consumer_api_key[-4:] if args.report_consumer_api_key else ''}")
+logger.info(f"DIS server API key: ... ...{args.report_consumer_api_key[-4:] if args.report_consumer_api_key else ''}")
 logger.info(f"Periodic report stats logging interval (minutes): {args.log_report_stats}")
 logger.info(f"Syslog UDP server: {args.syslog_server}")
 logger.info(f"Syslog TCP server: {args.syslog_tcp_server}")
@@ -519,6 +519,7 @@ if args.syslog_server:
         syslog_handler = logging.handlers.SysLogHandler(address=(syslog_hostname, syslog_port),
                                                         facility=args.syslog_facility,
                                                         socktype=socket.SOCK_DGRAM)
+        syslog_handler.setFormatter(syslog_formatter)
         logger.addHandler(syslog_handler)
     except Exception as ex:
         logger.info(f"Error creating datagram syslog handler for {args.syslog_server}: {ex}")
@@ -535,6 +536,7 @@ if args.syslog_tcp_server:
         syslog_handler = logging.handlers.SysLogHandler(address=(syslog_hostname, syslog_port),
                                                         facility=args.syslog_facility,
                                                         socktype=socket.SOCK_STREAM)
+        syslog_handler.setFormatter(syslog_formatter)
         logger.addHandler(syslog_handler)
     except Exception as ex:
         logger.info(f"Error creating syslog TCP handler for {args.syslog_tcp_server}: {ex}")

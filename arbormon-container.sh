@@ -337,24 +337,38 @@ function docker-run()
     if [ ! -z "$syslog_server" ]; then
       if [[ ! -z "$syslog_tcp_server" || ! -z "$syslog_socket" ]]; then
         bailout "syslog server, tcp server and socket are mutually exclusive."
-      else
-        syslog_command_args=(--syslog-server "$syslog_server")
       fi
+      if [[ "$syslog_server" == "127.0.0.1" || "$syslog_server" == "localhost" ]]; then
+        docker_interface="docker0"
+        syslog_server=$(interface-address $docker_interface)
+        echo "Replacing localhost address with $docker_interface interface address $syslog_server"
+        if [[ -z "$syslog_server" ]]; then
+            bailout "Could not determine IP address for interface $docker_interface"
+        fi
+      fi
+      syslog_command_args=(--syslog-server "$syslog_server")
     fi
     if [ ! -z "$syslog_tcp_server" ]; then
       if [[ ! -z "$syslog_server" || ! -z "$syslog_socket" ]]; then
-       bailout "syslog tcp server, server and socket are mutually exclusive."
-      else
-        syslog_command_args=(--syslog-tcp-server "$syslog_tcp_server")
+        bailout "syslog tcp server, server and socket are mutually exclusive."
       fi
+      if [[ "$syslog_tcp_server" == "127.0.0.1" || "$syslog_tcp_server" == "localhost" ]]; then
+        docker_interface="docker0"
+        syslog_tcp_server=$(interface-address $docker_interface)
+        echo "Replacing localhost address with $docker_interface interface address $syslog_tcp_server"
+        if [[ -z "$syslog_tcp_server" ]]; then
+            bailout "Could not determine IP address for interface $docker_interface"
+        fi
+      fi
+      syslog_command_args=(--syslog-tcp-server "$syslog_tcp_server")
     fi
     if [ ! -z "$syslog_socket" ]; then
       if [[ ! -z "$syslog_server" || ! -z "$syslog_tcp_server" ]]; then
         bailout "syslog socket, server and  tcp server are mutually exclusive."
       else
         # Assuming log socket identical in and outside of container
-        syslog_command_args=(--syslog-socket "$syslog_socket")
-        syslog_socket_mount_args=(--mount type=bind,source="$syslog_socket",target="$syslog_socket")
+        syslog_command_args=(--syslog-socket /var/syslog-proxy.socket)
+        syslog_socket_mount_args=(--mount type=bind,source="$syslog_socket",target=syslog-proxy.socket)
       fi
     fi
 
@@ -526,6 +540,16 @@ function docker-address()
                  ${container_name})
     if [ -z "$ip_address" ]; then
         bailout "Could not get the IP address for container $container_id"
+    fi
+    echo "${ip_address}"
+}
+
+function interface-address()
+{
+    local interface="$1"
+    ip_address=$(ip -o -4 addr list $interface | awk '{print $4}' | cut -d/ -f1)
+    if [ -z "$ip_address" ]; then
+        bailout "Could not get the IP address for interface $interface"
     fi
     echo "${ip_address}"
 }
