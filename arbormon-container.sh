@@ -363,10 +363,10 @@ function docker-run()
 
     # Finally add the facility
     if [ ! -z "$syslog_facility" ]; then
-      if [ ! -z "${syslog_facility##[0-9]*}" ]; then
-        bailout "syslog facility must be numeric, see https://en.wikipedia.org/wiki/Syslog#Facility for corresponding number."  
-      fi
-      syslog_command_args+=(--syslog-facility "$syslog_facility")
+        if [ ! -z "${syslog_facility##[0-9]*}" ]; then
+            bailout "syslog facility must be numeric, see https://en.wikipedia.org/wiki/Syslog#Facility for corresponding number."
+        fi
+        syslog_command_args+=(--syslog-facility "$syslog_facility")
     fi
 
     if [ ! -z "$log_report_stats" ]; then
@@ -379,41 +379,41 @@ function docker-run()
 
     # check and mount the report store dir
     if [ ! -z "$report_store_dir" ]; then
-      # directory exits?
-      if [ ! -d "$report_store_dir" ]; then
-        bailout "The specified report storage directory ($report_store_dir) doesn't exist or is not a directory"
-      fi
+        # directory exits?
+        if [ ! -d "$report_store_dir" ]; then
+            bailout "The specified report storage directory ($report_store_dir) doesn't exist or is not a directory"
+        fi
 
-      report_store_mount_args=(--mount type=bind,source="$report_store_dir",target=/var/reportstore)
-      report_store_command_args=(--report-store-dir /var/reportstore)
+        report_store_mount_args=(--mount type=bind,source="$report_store_dir",target=/var/reportstore)
+        report_store_command_args=(--report-store-dir /var/reportstore)
     fi
 
     # Check value of report-store-format
     if [ ! -z "$report_store_format" ];then
-      if [[ "$report_store_format" != "only-source-attributes" && "$report_store_format" != "all-attributes" ]];then
-        bailout "report-store-format can only be set to \"only-source-attributes\" or \"all-attributes\"."
-      else
-        report_format_command_args=(--report-store-format "$report_store_format")
-      fi
+        if [[ "$report_store_format" != "only-source-attributes" && "$report_store_format" != "all-attributes" ]];then
+            bailout "report-store-format can only be set to \"only-source-attributes\" or \"all-attributes\"."
+        else
+            report_format_command_args=(--report-store-format "$report_store_format")
+        fi
     fi
 
     user_command_args=()    
     if [ ! -z "$docker_as_user" ];then
-      as_user=$(id -u "$docker_as_user")
-      if [ $? -ne 0 ] ; then
-        bailout "Run as user not found."
-      fi
-      user_command_args=(--user "$as_user":)
+        as_user=$(id -u "$docker_as_user")
+        if [ $? -ne 0 ] ; then
+            bailout "Run as user not found."
+        fi
+        user_command_args=(--user "$as_user":)
     fi
     if [ ! -z "$docker_as_group" ];then
-      if [ -z "$docker_as_user" ];then
-        bailout "Setting run as group without the user not possible."
-      fi
-      as_group=$(getent group "$docker_as_group" | awk -F\: '{print $3}')
-      if [ $? -ne 0 ] ; then
-        bailout "Run as group not found."
-      fi
-      user_command_args=(--user "$as_user":"$as_group")
+        if [ -z "$docker_as_user" ];then
+            bailout "Setting run as group without the user not possible."
+        fi
+        as_group=$(getent group "$docker_as_group" | awk -F\: '{print $3}')
+        if [ $? -ne 0 ] ; then
+            bailout "Run as group not found."
+        fi
+        user_command_args=(--user "$as_user":"$as_group")
     fi
 
     if [ ! -z "$debug" ]; then
