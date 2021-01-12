@@ -330,46 +330,35 @@ function docker-run()
     if [ ! -z "$webhook_token" ]; then
         webhook_token_opt="--webhook-token $webhook_token"
     fi
-    # Make syslog_server, syslog_tcp_server and syslog_socket mutually exclusive
-    # Slight ugliness here...
+
     syslog_command_args=()
     syslog_socket_mount_args=()
     if [ ! -z "$syslog_server" ]; then
-      if [[ ! -z "$syslog_tcp_server" || ! -z "$syslog_socket" ]]; then
-        bailout "syslog server, tcp server and socket are mutually exclusive."
-      fi
-      if [[ "$syslog_server" == "127.0.0.1" || "$syslog_server" == "localhost" ]]; then
-        docker_interface="docker0"
-        syslog_server=$(interface-address $docker_interface)
-        echo "Replacing localhost address with $docker_interface interface address $syslog_server"
-        if [[ -z "$syslog_server" ]]; then
-            bailout "Could not determine IP address for interface $docker_interface"
+        if [[ "$syslog_server" == "127.0.0.1" || "$syslog_server" == "localhost" ]]; then
+            docker_interface="docker0"
+            syslog_server=$(interface-address $docker_interface)
+            echo "Replacing localhost address with $docker_interface interface address $syslog_server"
+            if [[ -z "$syslog_server" ]]; then
+                bailout "Could not determine IP address for interface $docker_interface"
+            fi
         fi
-      fi
-      syslog_command_args=(--syslog-server "$syslog_server")
+        syslog_command_args+=(--syslog-server "$syslog_server")
     fi
     if [ ! -z "$syslog_tcp_server" ]; then
-      if [[ ! -z "$syslog_server" || ! -z "$syslog_socket" ]]; then
-        bailout "syslog tcp server, server and socket are mutually exclusive."
-      fi
-      if [[ "$syslog_tcp_server" == "127.0.0.1" || "$syslog_tcp_server" == "localhost" ]]; then
-        docker_interface="docker0"
-        syslog_tcp_server=$(interface-address $docker_interface)
-        echo "Replacing localhost address with $docker_interface interface address $syslog_tcp_server"
-        if [[ -z "$syslog_tcp_server" ]]; then
-            bailout "Could not determine IP address for interface $docker_interface"
+        if [[ "$syslog_tcp_server" == "127.0.0.1" || "$syslog_tcp_server" == "localhost" ]]; then
+            docker_interface="docker0"
+            syslog_tcp_server=$(interface-address $docker_interface)
+            echo "Replacing localhost address with $docker_interface interface address $syslog_tcp_server"
+            if [[ -z "$syslog_tcp_server" ]]; then
+                bailout "Could not determine IP address for interface $docker_interface"
+            fi
         fi
-      fi
-      syslog_command_args=(--syslog-tcp-server "$syslog_tcp_server")
+        syslog_command_args+=(--syslog-tcp-server "$syslog_tcp_server")
     fi
     if [ ! -z "$syslog_socket" ]; then
-      if [[ ! -z "$syslog_server" || ! -z "$syslog_tcp_server" ]]; then
-        bailout "syslog socket, server and  tcp server are mutually exclusive."
-      else
         # Assuming log socket identical in and outside of container
-        syslog_command_args=(--syslog-socket /var/syslog-proxy.socket)
-        syslog_socket_mount_args=(--mount type=bind,source="$syslog_socket",target=syslog-proxy.socket)
-      fi
+        syslog_command_args+=(--syslog-socket /var/syslog-proxy.socket)
+        syslog_socket_mount_args=(--mount type=bind,source="$syslog_socket",target=/var/syslog-proxy.socket)
     fi
 
     # Finally add the facility
