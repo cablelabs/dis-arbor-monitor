@@ -391,14 +391,14 @@ function docker-run()
     # check and mount the report store dir
     if [ ! -z "$report_store_dir" ]; then
       # directory exits?
-      if [ -d "$report_store_dir" ]; then
-        # directory writable
-        if [ -w "$report_store_dir" ]; then
-          report_store_mount_args=(--mount type=bind,source="$report_store_dir",target=/var/jsonstore)
-          report_store_command_args=(--report-store-dir /var/jsonstore)
-        fi
+      if [ ! -d "$report_store_dir" ]; then
+        bailout "The specified report storage directory ($report_store_dir) doesn't exist or is not a directory"
       fi
+
+      report_store_mount_args=(--mount type=bind,source="$report_store_dir",target=/var/reportstore)
+      report_store_command_args=(--report-store-dir /var/reportstore)
     fi
+
     # Check value of report-store-format
     if [ ! -z "$report_store_format" ];then
       if [[ "$report_store_format" != "only-source-attributes" && "$report_store_format" != "all-attributes" ]];then
