@@ -71,6 +71,10 @@ function print_usage()
     echo "       (default \"$DEF_IMAGE_TAG\")"
     echo "   [--docker-name <docker name to assign>]"
     echo "       (default \"$DEF_CONTAINER_NAME\")"
+    echo "   [--docker-as-user <user name to run container as>]"
+    echo "       (default \"$DEF_DOCKER_AS_USER\")"
+    echo "   [--docker-as-group <group name to run container as>]"
+    echo "       (default \"$DEF_DOCKER_AS_GROUP\")"
     echo "   [--bind-address <address to bind ${shortname} to>]"
     echo "       (default \"$DEF_BIND_ADDRESS\")"
     echo "   [--bind-port <port to bind ${shortname} to>]"
@@ -87,10 +91,24 @@ function print_usage()
     echo "       (default \"$DEF_ARBOR_REST_API_TOKEN\")"
     echo "   [--arbor-api-insecure]"
     echo "       (default \"$DEF_ARBOR_REST_API_INSECURE\")"
-    echo "   [--report-consumer-url <url for posting report data>]"
-    echo "       (default \"$DEF_REPORT_CONSUMER_URL\")"
     echo "   [--report-consumer-api-key <API key for reporting>]"
     echo "       (default \"$DEF_REPORT_API_KEY\")"
+    echo "   [--syslog-server <syslog UDP server or server:port>]"
+    echo "       (default \"$DEF_SYSLOG_SERVER\")"
+    echo "   [--syslog-tcp-server <syslog TCP server or server:port>]"
+    echo "       (default \"$DEF_SYSLOG_TCP_SERVER\")"
+    echo "   [--syslog-socket <syslog socket file>]"
+    echo "       (default \"$DEF_SYSLOG_SOCKET\")"
+    echo "   [--syslog-facility <syslog numeric facility code>]"
+    echo "       (default \"$DEF_SYSLOG_FACILITY\")"
+    echo "   [--log-prefix <log prefix string>]"
+    echo "       (default \"$DEF_LOG_PREFIX\")"
+    echo "   [--log-report-stats <Report stats every x min>]"
+    echo "       (default \"$DEF_PERIODIC_REPORT_MINS\")"
+    echo "   [--report-store-dir <report directory>]"
+    echo "       (default \"$DEF_REPORT_STORE_DIR\")"
+    echo "   [--report-store-format <"only-source-attributes"|"all-attributes">]"
+    echo "       (default \"$DEF_REPORT_STORE_FORMAT\")"
 }
 
 function process_arguments()
@@ -110,9 +128,18 @@ function process_arguments()
     arbor_rest_api_prefix="$DEF_ARBOR_REST_API_PREFIX"
     arbor_rest_api_token="$DEF_ARBOR_REST_API_TOKEN"
     arbor_rest_api_insecure="$DEF_ARBOR_REST_API_INSECURE"
-    report_consumer_url="$DEF_REPORT_CONSUMER_URL"
     report_consumer_api_key="$DEF_REPORT_CONSUMER_API_KEY"
-    debug=
+    log_report_stats="$DEF_LOG_REPORT_STATS"
+    log_prefix="$DEF_LOG_PREFIX"
+    syslog_server="$DEF_SYSLOG_SERVER"
+    syslog_tcp_server="$DEF_SYSLOG_TCP_SERVER"
+    syslog_socket="$DEF_SYSLOG_SOCKET"
+    syslog_facility="$DEF_SYSLOG_FACILITY"
+    report_store_dir="$DEF_REPORT_STORE_DIR"
+    report_store_format="$DEF_REPORT_STORE_FORMAT"
+    docker_as_user="$DEF_DOCKER_AS_USER"
+    docker_as_group="$DEF_DOCKER_AS_GROUP"
+    debug="$DEF_DEBUG"
 
     while [[ $1 == --* ]]; do
         opt_name=$1
@@ -127,6 +154,14 @@ function process_arguments()
         elif [ "$opt_name" == "--docker-name" ]; then
             shift
             container_name="$opt_name"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--docker-as-user" ]; then
+            shift
+            docker_as_user="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--docker-as-group" ]; then
+            shift
+            docker_as_group="$1"
             shift || bailout_with_usage "missing parameter to $opt_name"
         elif [ "$opt_name" == "--tls-cert-chain-file" ]; then
             shift
@@ -159,17 +194,73 @@ function process_arguments()
         elif [ "$opt_name" == "--arbor-api-insecure" ]; then
             shift
             arbor_rest_api_insecure="True"
-        elif [ "$opt_name" == "--report-consumer-url" ]; then
-            shift
-            report_consumer_url="$1"
-            shift || bailout_with_usage "missing parameter to $opt_name"
         elif [ "$opt_name" == "--report-consumer-api-key" ]; then
             shift
             report_consumer_api_key="$1"
             shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--log-prefix" ]; then
+            shift
+            log_prefix="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--log-report-stats" ]; then
+            shift
+            log_report_stats="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--syslog-server" ]; then
+            shift
+            syslog_server="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--syslog-tcp-server" ]; then
+            shift
+            syslog_tcp_server="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--syslog-socket" ]; then
+            shift
+            syslog_socket="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--syslog-facility" ]; then
+            shift
+            syslog_facility="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--report-store-dir" ]; then
+            shift
+            report_store_dir="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--report-store-format" ]; then
+            shift
+            report_store_format="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
         elif [ "$opt_name" == "--debug" ]; then
             shift
             debug=true
+        elif [ "$opt_name" == "--syslog-server" ]; then
+            shift
+            syslog_server="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--syslog-tcp-server" ]; then
+            shift
+            syslog_tcp_server="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--syslog-socket" ]; then
+            shift
+            syslog_socket="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--syslog-facility" ]; then
+            shift
+            syslog_facility="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--log-prefix" ]; then
+            shift
+            log_prefix="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--report-store-dir" ]; then
+            shift
+            report_store_dir="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--report-store-format " ]; then
+            shift
+            report_store_format="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
         else
             bailout_with_usage "Unrecognized option: $opt_name"
         fi
@@ -185,6 +276,8 @@ function process_arguments()
     if [ ! -z $debug ]; then
         echo "docker_image_id: $docker_image_id"
         echo "docker_image_tag: $docker_image_tag"
+        echo "docker_as_user: $docker_as_user"
+        echo "docker_as_group: $docker_as_group"
         echo "container_name: $container_name"
         echo "tls_cert_chain_file: $tls_cert_chain_file"
         echo "tls_priv_key_file: $tls_priv_key_file"
@@ -194,8 +287,16 @@ function process_arguments()
         echo "arbor_rest_api_prefix: $arbor_rest_api_prefix"
         echo "arbor_rest_api_token: $arbor_rest_api_token"
         echo "arbor_rest_api_insecure: $arbor_rest_api_insecure"
-        echo "report_consumer_url: $report_consumer_url"
         echo "report_consumer_api_key: $report_consumer_api_key"
+        echo "log_report_stats: $log_report_stats"
+        echo "syslog_server: $syslog_server"
+        echo "syslog_tcp_server: $syslog_tcp_server"
+        echo "syslog_socket: $syslog_socket"
+        echo "syslog_facility: $syslog_facility"
+        echo "report_store_dir: $report_store_dir"
+        echo "report_store_format: $report_store_format"
+        echo "log_prefix: $log_prefix"
+        echo "debug: $debug"
     fi
 }
 
@@ -230,6 +331,91 @@ function docker-run()
         webhook_token_opt="--webhook-token $webhook_token"
     fi
 
+    syslog_command_args=()
+    syslog_socket_mount_args=()
+    if [ ! -z "$syslog_server" ]; then
+        if [[ "$syslog_server" == "127.0.0.1" || "$syslog_server" == "localhost" ]]; then
+            docker_interface="docker0"
+            syslog_server=$(interface-address $docker_interface)
+            echo "Replacing localhost address with $docker_interface interface address $syslog_server"
+            if [[ -z "$syslog_server" ]]; then
+                bailout "Could not determine IP address for interface $docker_interface"
+            fi
+        fi
+        syslog_command_args+=(--syslog-server "$syslog_server")
+    fi
+    if [ ! -z "$syslog_tcp_server" ]; then
+        if [[ "$syslog_tcp_server" == "127.0.0.1" || "$syslog_tcp_server" == "localhost" ]]; then
+            docker_interface="docker0"
+            syslog_tcp_server=$(interface-address $docker_interface)
+            echo "Replacing localhost address with $docker_interface interface address $syslog_tcp_server"
+            if [[ -z "$syslog_tcp_server" ]]; then
+                bailout "Could not determine IP address for interface $docker_interface"
+            fi
+        fi
+        syslog_command_args+=(--syslog-tcp-server "$syslog_tcp_server")
+    fi
+    if [ ! -z "$syslog_socket" ]; then
+        # Assuming log socket identical in and outside of container
+        syslog_command_args+=(--syslog-socket /var/syslog-proxy.socket)
+        syslog_socket_mount_args=(--mount type=bind,source="$syslog_socket",target=/var/syslog-proxy.socket)
+    fi
+
+    # Finally add the facility
+    if [ ! -z "$syslog_facility" ]; then
+        if [ ! -z "${syslog_facility##[0-9]*}" ]; then
+            bailout "syslog facility must be numeric, see https://en.wikipedia.org/wiki/Syslog#Facility for corresponding number."
+        fi
+        syslog_command_args+=(--syslog-facility "$syslog_facility")
+    fi
+
+    if [ ! -z "$log_report_stats" ]; then
+        log_report_opt="--log-report-stats $log_report_stats"
+    fi
+
+    if [ ! -z "$log_prefix" ]; then
+        log_prefix_opt="--log-prefix $log_prefix"
+    fi
+
+    # check and mount the report store dir
+    if [ ! -z "$report_store_dir" ]; then
+        # directory exits?
+        if [ ! -d "$report_store_dir" ]; then
+            bailout "The specified report storage directory ($report_store_dir) doesn't exist or is not a directory"
+        fi
+
+        report_store_mount_args=(--mount type=bind,source="$report_store_dir",target=/var/reportstore)
+        report_store_command_args=(--report-store-dir /var/reportstore)
+    fi
+
+    # Check value of report-store-format
+    if [ ! -z "$report_store_format" ];then
+        if [[ "$report_store_format" != "only-source-attributes" && "$report_store_format" != "all-attributes" ]];then
+            bailout "report-store-format can only be set to \"only-source-attributes\" or \"all-attributes\"."
+        else
+            report_format_command_args=(--report-store-format "$report_store_format")
+        fi
+    fi
+
+    user_command_args=()    
+    if [ ! -z "$docker_as_user" ];then
+        as_user=$(id -u "$docker_as_user")
+        if [ $? -ne 0 ] ; then
+            bailout "Run as user not found."
+        fi
+        user_command_args=(--user "$as_user":)
+    fi
+    if [ ! -z "$docker_as_group" ];then
+        if [ -z "$docker_as_user" ];then
+            bailout "Setting run as group without the user not possible."
+        fi
+        as_group=$(getent group "$docker_as_group" | awk -F\: '{print $3}')
+        if [ $? -ne 0 ] ; then
+            bailout "Run as group not found."
+        fi
+        user_command_args=(--user "$as_user":"$as_group")
+    fi
+
     if [ ! -z "$debug" ]; then
         debug_opt="--debug"
     fi
@@ -241,9 +427,15 @@ function docker-run()
                               --arbor-api-prefix "$arbor_rest_api_prefix"
                               --arbor-api-token "$arbor_rest_api_token"
                               $arbor_rest_api_insecure_opt
-                              --report-consumer-url "$report_consumer_url"
                               --report-consumer-api-key "$report_consumer_api_key"
-                              "${cert_key_command_args[@]}")
+                              $log_prefix_opt
+                              $log_report_opt
+                              "${cert_key_command_args[@]}"
+                              "${syslog_command_args[@]}"
+                              "${report_store_command_args[@]}"
+                              "${report_format_command_args[@]}")
+
+    
     exec_options=(--read-only -d --restart unless-stopped)
 
     if [ "$1" == "interactive" ]; then
@@ -261,9 +453,12 @@ function docker-run()
 
     echo "Starting container \"$container_name\" from $docker_image_id:$docker_image_tag (on $bind_address:$bind_port)"
     $DOCKER_CMD run "${exec_options[@]}" \
+        "${user_command_args[@]}" \
         --name "$container_name" \
         -p "$bind_address:$bind_port:$bind_port" \
         "${cert_key_mount_args[@]}" \
+        "${report_store_mount_args[@]}" \
+        "${syslog_socket_mount_args[@]}" \
         "$docker_image_id:$docker_image_tag" \
         "${docker_run_params[@]}"
 }
@@ -334,6 +529,16 @@ function docker-address()
                  ${container_name})
     if [ -z "$ip_address" ]; then
         bailout "Could not get the IP address for container $container_id"
+    fi
+    echo "${ip_address}"
+}
+
+function interface-address()
+{
+    local interface="$1"
+    ip_address=$(ip -o -4 addr list $interface | awk '{print $4}' | cut -d/ -f1)
+    if [ -z "$ip_address" ]; then
+        bailout "Could not get the IP address for interface $interface"
     fi
     echo "${ip_address}"
 }
