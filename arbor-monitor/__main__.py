@@ -1,5 +1,5 @@
 from quart import Quart,request, jsonify
-import json, requests, logging, logging.handlers, socket, asyncio, os, argparse, dateutil.parser, time
+import json, requests, logging, logging.handlers, socket, asyncio, os, argparse, dateutil.parser, time, setproctitle
 from ipaddress import IPv4Address, IPv4Network
 from dis_client_sdk import DisClient
 from pathlib import Path
@@ -572,6 +572,20 @@ total_source_ips_reported = 0
 
 if args.log_report_stats:
     start_status_reporting(args.log_report_stats)
+
+# Hide sensitive command line arguments
+cur_proc_title = setproctitle.getproctitle()
+
+if args.arbor_api_token:
+    cur_proc_title = cur_proc_title.replace(args.arbor_api_token, "[token hidden]")
+
+if args.report_consumer_api_key:
+    cur_proc_title = cur_proc_title.replace(args.report_consumer_api_key, "[key hidden]")
+
+if args.webhook_token:
+    cur_proc_title = cur_proc_title.replace(args.webhook_token, "[token hidden]")
+
+setproctitle.setproctitle(cur_proc_title)
 
 app.run(debug=args.debug, host=args.bind_address, port=args.bind_port,
         certfile=cert_chain_filename, keyfile=cert_key_filename)
