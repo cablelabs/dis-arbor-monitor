@@ -84,8 +84,6 @@ async def process_sightline_webhook_notification():
             logger.warning(msg, exc_info=ex)
             return jsonify({"error": msg}), 404, {'Content-Type': 'application/json'}
 
-        logger.info(f"Attack ID {attack_id}: Found {len(source_ip_list)} source IPs")
-        logger.info(f"Attack ID {attack_id}: First 50 source IPs: {source_ip_list[0:50]}")
         total_reports_sent += 1
         total_source_ips_reported += len(source_ip_list)
         if report_storage_path:
@@ -175,6 +173,8 @@ def send_report_to_dis_server(attack_id, attack_payload, src_traffic_report):
 
     # Add the source address info from the report to the event
     source_ip_list = add_source_ips_v2(dis_client, dis_event, attack_id, src_traffic_report)
+    logger.info(f"Attack ID {attack_id}: Found {len(source_ip_list)} source IPs")
+    logger.info(f"Attack ID {attack_id}: First 50 source IPs: {source_ip_list[0:50]}")
 
     staged_event_ids = dis_client.get_staged_event_ids()
     logger.info(f"Attack ID {attack_id}: Staged event IDs: {staged_event_ids}")
@@ -254,7 +254,7 @@ def add_source_ips_v2(dis_client, dis_event, attack_id, src_traffic_report):
             logger.debug(f"    name: {elem_name}, max bps: {elem_max_bps}")
             net_addr = IPv4Network(elem_name, strict=True)
             if net_addr.prefixlen != 32:
-                logger.info(f"Attack {attack_id}: Network bitmask for {elem_id} is not 32 bits ({elem_name})")
+                logger.debug(f"Attack {attack_id}: Network bitmask for {elem_id} is not 32 bits ({elem_name})")
             else:
                 ip_addr_str = str(net_addr.network_address)
                 dis_client.add_attack_source_to_event(dis_event,
