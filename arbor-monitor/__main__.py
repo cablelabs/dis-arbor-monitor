@@ -576,7 +576,13 @@ if args.log_report_stats:
 # Ready to run, now hide command line arguments and change my process name
 # for easier monitoring and hide api keys from cli. Not 100% failsafe but
 # ok-ish
-setproctitle.setproctitle(args.log_prefix)
+cur_proc_title = setproctitle.getproctitle()
+logger.info("Current proc title: " + cur_proc_title)
+cur_proc_title = cur_proc_title.replace(args.arbor_api_token, "ARBOR_API_TOKEN_HIDDEN") \
+                               .replace(args.report_consumer_api_key, "DIS_API_TOKEN_HIDDEN") \
+                               .replace(args.webhook_token, "WEBHOOK_TOKEN_HIDDEN")
+logger.info("Adjusted proc title: " + cur_proc_title)
+setproctitle.setproctitle(cur_proc_title)
 
 app.run(debug=args.debug, host=args.bind_address, port=args.bind_port,
         certfile=cert_chain_filename, keyfile=cert_key_filename)
