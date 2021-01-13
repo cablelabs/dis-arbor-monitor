@@ -577,10 +577,19 @@ if args.log_report_stats:
 # for easier monitoring and hide api keys from cli. Not 100% failsafe but
 # ok-ish
 cur_proc_title = setproctitle.getproctitle()
+
+# TODO: REMOVE ME
 logger.info("Current proc title: " + cur_proc_title)
-cur_proc_title = cur_proc_title.replace(args.arbor_api_token, "ARBOR_API_TOKEN_HIDDEN") \
-                               .replace(args.report_consumer_api_key, "DIS_API_TOKEN_HIDDEN") \
-                               .replace(args.webhook_token, "WEBHOOK_TOKEN_HIDDEN")
+if args.arbor_api_token:
+    cur_proc_title = cur_proc_title.replace(args.arbor_api_token, "ARBOR_API_TOKEN_HIDDEN")
+
+if args.report_consumer_api_key:
+    cur_proc_title = cur_proc_title.replace(args.report_consumer_api_key, "DIS_API_TOKEN_HIDDEN")
+
+if args.webhook_token:
+    cur_proc_title = cur_proc_title.replace(args.webhook_token, "WEBHOOK_TOKEN_HIDDEN")
+
+# TODO: REMOVE ME
 logger.info("Adjusted proc title: " + cur_proc_title)
 setproctitle.setproctitle(cur_proc_title)
 
