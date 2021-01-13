@@ -580,7 +580,7 @@ if args.arbor_api_token:
     cur_proc_title = cur_proc_title.replace(args.arbor_api_token, "[token hidden]")
 
 if args.report_consumer_api_key:
-    cur_proc_title = cur_proc_title.replace(args.report_consumer_api_key, "[token hidden]")
+    cur_proc_title = cur_proc_title.replace(args.report_consumer_api_key, "[key hidden]")
 
 if args.webhook_token:
     cur_proc_title = cur_proc_title.replace(args.webhook_token, "[token hidden]")
