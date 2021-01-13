@@ -573,24 +573,18 @@ total_source_ips_reported = 0
 if args.log_report_stats:
     start_status_reporting(args.log_report_stats)
 
-# Ready to run, now hide command line arguments and change my process name
-# for easier monitoring and hide api keys from cli. Not 100% failsafe but
-# ok-ish
+# Hide sensitive command line arguments
 cur_proc_title = setproctitle.getproctitle()
 
-# TODO: REMOVE ME
-logger.info("Current proc title: " + cur_proc_title)
 if args.arbor_api_token:
-    cur_proc_title = cur_proc_title.replace(args.arbor_api_token, "ARBOR_API_TOKEN_HIDDEN")
+    cur_proc_title = cur_proc_title.replace(args.arbor_api_token, "[token hidden]")
 
 if args.report_consumer_api_key:
-    cur_proc_title = cur_proc_title.replace(args.report_consumer_api_key, "DIS_API_TOKEN_HIDDEN")
+    cur_proc_title = cur_proc_title.replace(args.report_consumer_api_key, "[token hidden]")
 
 if args.webhook_token:
-    cur_proc_title = cur_proc_title.replace(args.webhook_token, "WEBHOOK_TOKEN_HIDDEN")
+    cur_proc_title = cur_proc_title.replace(args.webhook_token, "[token hidden]")
 
-# TODO: REMOVE ME
-logger.info("Adjusted proc title: " + cur_proc_title)
 setproctitle.setproctitle(cur_proc_title)
 
 app.run(debug=args.debug, host=args.bind_address, port=args.bind_port,
