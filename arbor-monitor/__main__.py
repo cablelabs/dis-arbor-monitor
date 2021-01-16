@@ -80,9 +80,11 @@ async def process_sightline_webhook_notification():
         try:
             source_ip_list = send_report_to_dis_server(attack_id, payload, src_traffic_report)
         except Exception as ex:
-            msg = f"Caught an exception uploading the report for attack {attack_id} ({ex})"
+	    # WORKAROUND SJC Adding test and making sure we continue
+            msg = f"Caught an exception uploading the report for attack {attack_id} ({ex}) - SJC sending 200 anyway"
             logger.warning(msg, exc_info=ex)
-            return jsonify({"error": msg}), 404, {'Content-Type': 'application/json'}
+            #return jsonify({"error": msg}), 404, {'Content-Type': 'application/json'}
+            return f"Continue on failed attack ID: {attack_id})", 200, {'Content-Type': 'text/plain'}
 
         total_reports_sent += 1
         total_source_ips_reported += len(source_ip_list)
@@ -176,11 +178,15 @@ def send_report_to_dis_server(attack_id, attack_payload, src_traffic_report):
     logger.info(f"Attack ID {attack_id}: Found {len(source_ip_list)} source IPs")
     logger.info(f"Attack ID {attack_id}: First 50 source IPs: {source_ip_list[0:50]}")
 
-    staged_event_ids = dis_client.get_staged_event_ids()
-    logger.info(f"Attack ID {attack_id}: Staged event IDs: {staged_event_ids}")
+    # WORKAROUND SJC: For now ignore previous eventID's as dis_event already has our current event
+    # WORKAROUND SJC: staged_event_ids = dis_client.get_staged_event_ids()
+    logger.info(f"Attack ID {attack_id}: Staged event ID: {dis_event}")
     # TODO: Add accessor for the DIS client base URL so we can log it
     logger.info(f"Attack ID {attack_id}: Sending report to DIS server")
-    dis_client.send()
+    # WORKAROUND SJC: Create send_one event
+    #dis_client.send()
+    dis_client.send_one(dis_event)
+	
     logger.info(f"Attack ID {attack_id}: Report sent to DIS server")
 
     return source_ip_list
@@ -298,9 +304,11 @@ def save_attack_report_file(report_storage_path, report_storage_format,
             elem_max_bps = bps_elem['max_value']
             logger.debug(f"    name: {elem_name}, max bps: {elem_max_bps}")
             net_addr = IPv4Network(elem_name, strict=True)
-            if net_addr.prefixlen != 32:
-                logger.info(f"Attack {attack_id}: Network bitmask for {elem_id} is not 32 bits ({elem_name}) - skipping")
-            else:
+            # WORKAROUND SJC
+            #if net_addr.prefixlen != 32:
+            #    logger.info(f"Attack {attack_id}: Network bitmask for {elem_id} is not 32 bits ({elem_name}) - skipping")
+            #else:
+            if net_addr.prefixlen == 32:
                 ip_addr_str = str(net_addr.network_address)
                 src_ip_info.append({"address": ip_addr_str, "max_bps": elem_max_bps})
         except Exception as ex:

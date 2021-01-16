@@ -125,3 +125,23 @@ class DisClient(object):
 
         self._sent_events.append(self._events)
         self._events = {}
+
+    def send_one(self, event_uuid: UUID4):
+	# WORKAROUND SJC: Creat a send one function to workaround upload issues
+        """Sends one staged attack events to DIS"""
+
+        events = []
+        events.append(self._events[event_uuid])
+
+        res = requests.post(self._dest_url, json={"events": events})
+
+        if res.status_code == 401:
+            raise Exception(
+                "Not authorized.  Check that your API Key is correct.")
+
+        if res.status_code >= 400:
+            raise Exception(res.json())
+
+        self._sent_events.append(self._events)
+	# WORKAROUND SJC: clear anyway as the other ID's should be consider lost anyway
+        self._events = {}
