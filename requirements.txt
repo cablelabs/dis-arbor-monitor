@@ -18,14 +18,6 @@
 
 Cython==0.29.14
 demjson==2.2.4
-dis-client-sdk==0.0.2
-  pydantic==1.6.1
-    dataclasses==0.7
-  requests==2.22.0
-    certifi==2019.11.28
-    chardet==3.0.4
-    idna==2.8
-    urllib3==1.25.7
 falcon==2.0.0
 gunicorn==20.0.0
   setuptools==45.1.0
@@ -41,6 +33,8 @@ jsonschema==3.2.0
   six==1.13.0
 pipdeptree==0.13.2
   pip==20.0.2
+pydantic==1.7.3
+  dataclasses==0.7
 python-dateutil==2.8.1
   six==1.13.0
 Quart==0.6.15
@@ -62,5 +56,10 @@ Quart==0.6.15
     MarkupSafe==1.1.1
   multidict==4.5.2
   sortedcontainers==2.1.0
+requests==2.25.1
+  certifi==2020.12.5
+  chardet==4.0.0
+  idna==2.10
+  urllib3==1.26.2
+setproctitle==1.2.1
 wheel==0.34.2
-setproctitle>=1.2.1
