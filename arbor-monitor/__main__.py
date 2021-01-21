@@ -70,6 +70,7 @@ async def process_sightline_webhook_notification():
     if response.status_code != 200:
         msg=f"Error retrieving the source traffic report for attack {attack_id}: {response.reason} ({response.content}))"
         logger.warning(msg)
+        # Returning a 404 so Netscout so we can try to retrieve the report again
         return jsonify({"error": msg}), 404, {'Content-Type': 'application/json'}
 
     src_traffic_report = response.json()
@@ -82,7 +83,7 @@ async def process_sightline_webhook_notification():
         except Exception as ex:
             msg = f"Caught an exception uploading the report for attack {attack_id} ({ex})"
             logger.warning(msg, exc_info=ex)
-            return jsonify({"error": msg}), 404, {'Content-Type': 'application/json'}
+            return jsonify({"warning": msg}), 200, {'Content-Type': 'application/json'}
 
         total_reports_sent += 1
         total_source_ips_reported += len(source_ip_list)
@@ -140,6 +141,7 @@ def get_src_traffic_report(attack_id):
                             headers={"X-Arbux-APIToken":args.arbor_api_token})
     return response
 
+
 def send_report_to_dis_server(attack_id, attack_payload, src_traffic_report):
     attack_attributes = attack_payload.get("data").get("attributes")
 
@@ -180,8 +182,8 @@ def send_report_to_dis_server(attack_id, attack_payload, src_traffic_report):
     logger.info(f"Attack ID {attack_id}: Staged event IDs: {staged_event_ids}")
     # TODO: Add accessor for the DIS client base URL so we can log it
     logger.info(f"Attack ID {attack_id}: Sending report to DIS server")
-    dis_client.send()
-    logger.info(f"Attack ID {attack_id}: Report sent to DIS server")
+    msg = dis_client.send()
+    logger.info(f"Attack ID {attack_id}: Report sent to DIS server ({msg})")
 
     return source_ip_list
 
