@@ -29,10 +29,10 @@ class IpAttribute(BaseModel):
 class DisClient(object):
     """SDK for the /data route for the DIS system.  Implements the REST API. """
 
-    def __init__(self, api_key: str, base_url: HttpUrl = "https://api.dissarm.net/v1", max_staged=0):
+    def __init__(self, api_key: str, base_url: HttpUrl = "https://api.dissarm.net/v1", staged_limit=0):
         self._key = api_key
         self._base_url = base_url
-        self._max_staged = max_staged
+        self._staged_limit = stage_limit
         self._events = {}
 
         res = requests.get(f"{base_url}/client/me?api_key={api_key}")
@@ -57,8 +57,8 @@ class DisClient(object):
                          attack_type: List[str] = None):
         """Stages an Event Attack to the outgoing DIS ingestion data.  Returns an ID to be used to reference the event in the SDK"""
 
-        if self._max_staged and len(self._events) == self._max_staged:
-            raise Exception(f"Too many staged events ({self._max_staged})")
+        if self._staged_limit and len(self._events) == self._staged_limit:
+            raise Exception(f"Too many staged events ({self._staged_limit})")
 
         event_uuid = str(uuid4())
         self._events[event_uuid] = {
@@ -124,7 +124,7 @@ class DisClient(object):
 
         if 500 <= res.status_code < 600 or res.status_code == 401:
             # Can be remedied on the server side - throw an error but don't clear the queue
-            raise Exception(f"DIS server returned server error status code {res.status_code} ({res.reason})")
+            raise Exception(f"DIS server returned recoverable server error status code {res.status_code} ({res.reason}) - {len(events)} reports queued")
 
         if 400 <= res.status_code < 500:
             # Not considered recoverable - so clear the queue

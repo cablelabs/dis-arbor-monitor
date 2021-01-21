@@ -82,7 +82,7 @@ async def process_sightline_webhook_notification():
             source_ip_list = send_report_to_dis_server(attack_id, payload, src_traffic_report)
         except Exception as ex:
             msg = f"Caught an exception uploading the report for attack {attack_id} ({ex})"
-            logger.warning(msg, exc_info=ex)
+            logger.warning(msg)
             return jsonify({"warning": msg}), 200, {'Content-Type': 'application/json'}
 
         total_reports_sent += 1
@@ -93,7 +93,7 @@ async def process_sightline_webhook_notification():
                                         attack_id, payload, src_traffic_report)
             except Exception as ex:
                 msg = f"Caught an exception saving the report for attack {attack_id} ({ex}) - report uploaded, CONTINUING"
-                logger.warning(msg, exc_info=ex)
+                logger.warning(msg)
                 # Not returning a 400 here so Netscout doesn't keep attempting to redeliver this attack
                 #  notification (causing potential duplicate reports and backing up Netscout's notify queue)
                 return jsonify({"warning": msg}), 200, {'Content-Type': 'application/json'}
@@ -413,6 +413,11 @@ arg_parser.add_argument ('--report-consumer-api-key', "-rckey,", required=not ar
                          action='store', type=str, default=arg_default, metavar="api_key",
                          help="Specify the API key to use for submitting attack reports "
                               "(or DIS_ARBORMON_REPORT_API_KEY)")
+arg_parser.add_argument ('--report-consumer-max-queued-reports', "-rcmqr,", required=False, action='store',
+                         type=int, metavar="max_queued_reports",
+                         default=os.environ.get('DIS_ARBORMON_MAX_QUEUED_REPORTS', 0),
+                         help="Specify the maximum number of DIS reports to queue if/when there's a transient "
+                              "issue sending a report(s) to the DIS server (or DIS_ARBORMON_MAX_QUEUED_REPORTS)")
 arg_parser.add_argument ('--syslog-server', "-slsu", required=False, action='store',
                          type=str, metavar="server",
                          default=os.environ.get('DIS_ARBORMON_SYSLOG_SERVER'),
@@ -420,7 +425,7 @@ arg_parser.add_argument ('--syslog-server', "-slsu", required=False, action='sto
                               "datagrams (or DIS_ARBORMON_SYSLOG_SERVER) in the format \"server\" "
                               "or \"server:udp-port\"")
 arg_parser.add_argument ('--syslog-tcp-server', "-slst", required=False, action='store',
-                         type=str, metavar="server",
+                         type=str, metavar="tcp_server",
                          default=os.environ.get('DIS_ARBORMON_SYSLOG_TCP_SERVER'),
                          help="Specify a syslog server for logging error/info messages using a TCP "
                               "connection (or DIS_ARBORMON_SYSLOG_TCP_SERVER) in the format \"server\" "
@@ -480,6 +485,7 @@ logger.info(f"Cert key file: {cert_key_filename}")
 logger.info(f"Arbor API prefix: {args.arbor_api_prefix}")
 logger.info(f"Arbor API token: ... ...{args.arbor_api_token[-4:] if args.arbor_api_token else ''}")
 logger.info(f"DIS server API key: ... ...{args.report_consumer_api_key[-4:] if args.report_consumer_api_key else ''}")
+logger.info(f"DIS server max queued reports: {args.report_consumer_max_queued_reports}")
 logger.info(f"Periodic report stats logging interval (minutes): {args.log_report_stats}")
 logger.info(f"Syslog UDP server: {args.syslog_server}")
 logger.info(f"Syslog TCP server: {args.syslog_tcp_server}")
@@ -490,7 +496,7 @@ logger.info(f"Report storage format: {args.report_store_format}")
 if args.dry_run:
     logger.info("RUNNING IN DRY-RUN MODE (not connecting/reporting to the DIS server)")
 else:
-    dis_client = DisClient(api_key=args.report_consumer_api_key)
+    dis_client = DisClient(api_key=args.report_consumer_api_key, staged_limit=args.report_consumer_max_queued_reports)
     dis_client_info = dis_client.get_info()
     logger.info(f"DIS client name: {dis_client_info.get('name')}")
     org = dis_client_info.get("organization")
