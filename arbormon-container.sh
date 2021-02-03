@@ -129,6 +129,7 @@ function process_arguments()
     arbor_rest_api_token="$DEF_ARBOR_REST_API_TOKEN"
     arbor_rest_api_insecure="$DEF_ARBOR_REST_API_INSECURE"
     report_consumer_api_key="$DEF_REPORT_CONSUMER_API_KEY"
+    max_queued_reports="$DEF_MAX_QUEUED_REPORTS"
     log_report_stats="$DEF_LOG_REPORT_STATS"
     log_prefix="$DEF_LOG_PREFIX"
     syslog_server="$DEF_SYSLOG_SERVER"
@@ -198,6 +199,10 @@ function process_arguments()
             shift
             report_consumer_api_key="$1"
             shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--max-queued-reports" ]; then
+            shift
+            max_queued_reports="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
         elif [ "$opt_name" == "--log-prefix" ]; then
             shift
             log_prefix="$1"
@@ -221,14 +226,6 @@ function process_arguments()
         elif [ "$opt_name" == "--syslog-facility" ]; then
             shift
             syslog_facility="$1"
-            shift || bailout_with_usage "missing parameter to $opt_name"
-        elif [ "$opt_name" == "--report-store-dir" ]; then
-            shift
-            report_store_dir="$1"
-            shift || bailout_with_usage "missing parameter to $opt_name"
-        elif [ "$opt_name" == "--report-store-format" ]; then
-            shift
-            report_store_format="$1"
             shift || bailout_with_usage "missing parameter to $opt_name"
         elif [ "$opt_name" == "--debug" ]; then
             shift
@@ -388,6 +385,10 @@ function docker-run()
         report_store_command_args=(--report-store-dir /var/reportstore)
     fi
 
+    if [ ! -z "$max_queued_reports" ]; then
+        max_queued_reports_opt="--max-queued-reports $max_queued_reports"
+    fi
+
     # Check value of report-store-format
     if [ ! -z "$report_store_format" ];then
         if [[ "$report_store_format" != "only-source-attributes" && "$report_store_format" != "all-attributes" ]];then
@@ -430,6 +431,7 @@ function docker-run()
                               --report-consumer-api-key "$report_consumer_api_key"
                               $log_prefix_opt
                               $log_report_opt
+                              $max_queued_reports_opt
                               "${cert_key_command_args[@]}"
                               "${syslog_command_args[@]}"
                               "${report_store_command_args[@]}"

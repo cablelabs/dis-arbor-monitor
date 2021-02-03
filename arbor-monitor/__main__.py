@@ -414,7 +414,7 @@ arg_parser.add_argument ('--report-consumer-api-key', "-rckey,", required=not ar
                          help="Specify the API key to use for submitting attack reports "
                               "(or DIS_ARBORMON_REPORT_API_KEY)")
 arg_parser.add_argument ('--max-queued-reports', "-rcmqr,", required=False, action='store',
-                         type=int, metavar="max_queued_reports",
+                         type=int, metavar="max_num_queued",
                          default=os.environ.get('DIS_ARBORMON_MAX_QUEUED_REPORTS', 0),
                          help="Specify the maximum number of DIS reports to queue if/when there's a transient "
                               "issue sending a report(s) to the DIS server (or DIS_ARBORMON_MAX_QUEUED_REPORTS)")
