@@ -413,7 +413,7 @@ arg_parser.add_argument ('--report-consumer-api-key', "-rckey,", required=not ar
                          action='store', type=str, default=arg_default, metavar="api_key",
                          help="Specify the API key to use for submitting attack reports "
                               "(or DIS_ARBORMON_REPORT_API_KEY)")
-arg_parser.add_argument ('--report-consumer-max-queued-reports', "-rcmqr,", required=False, action='store',
+arg_parser.add_argument ('--max-queued-reports', "-rcmqr,", required=False, action='store',
                          type=int, metavar="max_queued_reports",
                          default=os.environ.get('DIS_ARBORMON_MAX_QUEUED_REPORTS', 0),
                          help="Specify the maximum number of DIS reports to queue if/when there's a transient "
@@ -485,7 +485,7 @@ logger.info(f"Cert key file: {cert_key_filename}")
 logger.info(f"Arbor API prefix: {args.arbor_api_prefix}")
 logger.info(f"Arbor API token: ... ...{args.arbor_api_token[-4:] if args.arbor_api_token else ''}")
 logger.info(f"DIS server API key: ... ...{args.report_consumer_api_key[-4:] if args.report_consumer_api_key else ''}")
-logger.info(f"DIS server max queued reports: {args.report_consumer_max_queued_reports}")
+logger.info(f"DIS server max queued reports: {args.max_queued_reports}")
 logger.info(f"Periodic report stats logging interval (minutes): {args.log_report_stats}")
 logger.info(f"Syslog UDP server: {args.syslog_server}")
 logger.info(f"Syslog TCP server: {args.syslog_tcp_server}")
@@ -496,7 +496,7 @@ logger.info(f"Report storage format: {args.report_store_format}")
 if args.dry_run:
     logger.info("RUNNING IN DRY-RUN MODE (not connecting/reporting to the DIS server)")
 else:
-    dis_client = DisClient(api_key=args.report_consumer_api_key, staged_limit=args.report_consumer_max_queued_reports)
+    dis_client = DisClient(api_key=args.report_consumer_api_key, staged_limit=args.max_queued_reports)
     dis_client_info = dis_client.get_info()
     logger.info(f"DIS client name: {dis_client_info.get('name')}")
     org = dis_client_info.get("organization")
