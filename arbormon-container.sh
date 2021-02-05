@@ -530,7 +530,7 @@ function docker-address()
                  -f '{{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}' \
                  ${container_name})
     if [ -z "$ip_address" ]; then
-        bailout "Could not get the IP address for container $container_id"
+        bailout "Could not get the IP address for container $container_name"
     fi
     echo "${ip_address}"
 }
