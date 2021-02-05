@@ -76,29 +76,32 @@ async def process_sightline_webhook_notification():
     src_traffic_report = response.json()
 
     if args.dry_run:
-        logger.info(f"Attack ID {attack_id}: Running in DRY RUN mode - not posting attack")
+        logger.info(f"Attack ID {attack_id}: Running in DRY RUN mode - not posting/saving attack report")
     else:
+        warn_msg = None
         try:
             source_ip_list = send_report_to_dis_server(attack_id, payload, src_traffic_report)
+            total_reports_sent += 1
+            total_source_ips_reported += len(source_ip_list)
+            # TODO: These stats may reflect queuing - need to revisit
         except Exception as ex:
-            msg = f"Caught an exception uploading the report for attack {attack_id} ({ex})"
-            logger.warning(msg)
-            return jsonify({"warning": msg}), 200, {'Content-Type': 'application/json'}
+            warn_msg = f"Caught an exception uploading the report for attack {attack_id} ({ex})"
+            logger.warning(warn_msg)
 
-        total_reports_sent += 1
-        total_source_ips_reported += len(source_ip_list)
         if report_storage_path:
             try:
                 save_attack_report_file(report_storage_path, args.report_store_format,
                                         attack_id, payload, src_traffic_report)
             except Exception as ex:
-                msg = f"Caught an exception saving the report for attack {attack_id} ({ex}) - report uploaded, CONTINUING"
-                logger.warning(msg)
-                # Not returning a 400 here so Netscout doesn't keep attempting to redeliver this attack
-                #  notification (causing potential duplicate reports and backing up Netscout's notify queue)
-                return jsonify({"warning": msg}), 200, {'Content-Type': 'application/json'}
+                warn_msg = f"Caught an exception saving the report for attack {attack_id} ({ex})"
+                logger.warning(warn_msg)
 
-    return f"Thank you Netscout for the DOS report! (attack ID {attack_id})", 200, {'Content-Type': 'text/plain'}
+    if warn_msg:
+        # Not returning a 400 here so Netscout doesn't keep attempting to redeliver this attack
+        #  notification (causing potential duplicate reports and backing up Netscout's notify queue)
+        return jsonify({"warning": warn_msg}), 200, {'Content-Type': 'application/json'}
+    else:
+        return f"Thank you Netscout for the DOS report! (attack ID {attack_id})", 200, {'Content-Type': 'text/plain'}
 
 def check_sightline_api_supported():
     """
@@ -183,7 +186,7 @@ def send_report_to_dis_server(attack_id, attack_payload, src_traffic_report):
     # TODO: Add accessor for the DIS client base URL so we can log it
     logger.info(f"Attack ID {attack_id}: Sending report to DIS server")
     msg = dis_client.send()
-    logger.info(f"Attack ID {attack_id}: Report sent to DIS server ({msg})")
+    logger.info(f"Attack ID {attack_id}: Report sent/queued to DIS server ({msg})")
 
     return source_ip_list
 
