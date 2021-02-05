@@ -497,17 +497,21 @@ if args.dry_run:
     logger.info("RUNNING IN DRY-RUN MODE (not connecting/reporting to the DIS server)")
 else:
     dis_client = DisClient(api_key=args.report_consumer_api_key, staged_limit=args.max_queued_reports)
-    dis_client_info = dis_client.get_info()
-    logger.info(f"DIS client name: {dis_client_info.get('name')}")
-    org = dis_client_info.get("organization")
-    logger.info(f"DIS client organization: {org.get('name') if org else 'Unknown'}")
-    logger.info(f"DIS client description: {dis_client_info.get('shortDescription')}")
-    logger.info(f"DIS client contact: {org.get('contactEmail')}")
-    client_type = dis_client_info.get("clientType")
-    logger.info(f"Client type name: {client_type.get('name')}")
-    logger.info(f"Client type maker: {client_type.get('maker')}")
-    logger.info(f"Client type version: {client_type.get('version')}")
-    # TODO: Check the maker (and version?)
+
+    try:
+        dis_client_info = dis_client.get_info()
+        logger.info(f"DIS client name: {dis_client_info.get('name')}")
+        org = dis_client_info.get("organization")
+        logger.info(f"DIS client organization: {org.get('name') if org else 'Unknown'}")
+        logger.info(f"DIS client description: {dis_client_info.get('shortDescription')}")
+        logger.info(f"DIS client contact: {org.get('contactEmail')}")
+        client_type = dis_client_info.get("clientType")
+        logger.info(f"Client type name: {client_type.get('name')}")
+        logger.info(f"Client type maker: {client_type.get('maker')}")
+        logger.info(f"Client type version: {client_type.get('version')}")
+        # TODO: Check the maker (and version?)
+    except Exception as ex:
+        logger.warning(f"Error getting client info from DIS server: {ex}")
 
 # Note: Setting up syslog after logging above here - so the above doesn't go into syslog
 syslog_formatter = logging.Formatter("%(name)s: %(message)s")

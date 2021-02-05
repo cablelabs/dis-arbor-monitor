@@ -35,19 +35,16 @@ class DisClient(object):
         self._staged_limit = staged_limit
         self._events = {}
 
-        res = requests.get(f"{base_url}/client/me?api_key={api_key}")
+    def get_info(self):
+        res = requests.get(f"{self._base_url}/client/me?api_key={api_key}")
 
         if res.status_code == 401:
-            raise Exception(
-                "Not authorized.  Check that your API Key is correct.")
+            raise Exception("Not authorized.  Check that your API Key is correct.")
 
-        if res.status_code >= 400:
-            raise Exception(res.json())
+        if res.status_code != 200:
+            raise Exception(f"DIS server returned status code {res.status_code} ({res.reason})")
 
-        self._me = res.json()
-
-    def get_info(self):
-        return self._me
+        return res.json()
 
     def get_dest(self):
         return self._dest_url
