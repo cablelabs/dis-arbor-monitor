@@ -29,10 +29,10 @@ class IpAttribute(BaseModel):
 class DisClient(object):
     """SDK for the /data route for the DIS system.  Implements the REST API. """
 
-    def __init__(self, api_key: str, base_url: HttpUrl = "https://api.dissarm.net/v1"):
+    def __init__(self, api_key: str, base_url: HttpUrl = "https://api.dissarm.net/v1", staged_limit=0):
         self._key = api_key
         self._base_url = base_url
-        self._dest_url = f"{self._base_url}/data?api_key={self._key}"
+        self._staged_limit = staged_limit
         self._events = {}
 
         res = requests.get(f"{base_url}/client/me?api_key={api_key}")
@@ -56,6 +56,9 @@ class DisClient(object):
                          end_timestamp: int,
                          attack_type: List[str] = None):
         """Stages an Event Attack to the outgoing DIS ingestion data.  Returns an ID to be used to reference the event in the SDK"""
+
+        if self._staged_limit and len(self._events) == self._staged_limit:
+            raise Exception(f"Too many staged events ({self._staged_limit})")
 
         event_uuid = str(uuid4())
         self._events[event_uuid] = {
@@ -112,14 +115,19 @@ class DisClient(object):
         events = []
         for k, v in self._events.items():
             events.append(v)
-        self._events = {}
 
-        res = requests.post(self._dest_url, json={"events": events})
+        res = requests.post("{0}/data?api_key={1}".format(self._base_url, self._key), json={"events": events})
 
-        if res.status_code == 401:
-            raise Exception(
-                "Not authorized.  Check that your API Key is correct.")
+        if 200 <= res.status_code < 400:
+            self._events = {}
+            return f"Sent {len(events)} events to {self._base_url} (status {res.status_code} ({res.reason}))"
 
-        if res.status_code >= 400:
-            raise Exception(f"server returned status code {res.status_code} ({res.reason})")
+        if 500 <= res.status_code < 600 or res.status_code == 401:
+            # Can be remedied on the server side - throw an error but don't clear the queue
+            raise Exception(f"DIS server returned recoverable server error status code {res.status_code} ({res.reason}) - {len(events)} reports queued")
+
+        if 400 <= res.status_code < 500:
+            # Not considered recoverable - so clear the queue
+            self._events = {}
+            raise Exception(f"DIS server returned client error status code {res.status_code} ({res.reason})")
 
