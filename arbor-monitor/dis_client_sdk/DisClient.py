@@ -36,7 +36,7 @@ class DisClient(object):
         self._events = {}
 
     def get_info(self):
-        res = requests.get(f"{self._base_url}/client/me?api_key={api_key}")
+        res = requests.get(f"{self._base_url}/client/me?api_key={self._key}")
 
         if res.status_code == 401:
             raise Exception("Not authorized.  Check that your API Key is correct.")
