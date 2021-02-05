@@ -42,7 +42,7 @@ class DisClient(object):
             raise Exception("Not authorized.  Check that your API Key is correct.")
 
         if res.status_code != 200:
-            raise Exception(f"DIS server returned status code {res.status_code} ({res.reason})")
+            raise Exception(f"DIS server returned status code {res.status_code} accessing {self._base_url} ({res.reason})")
 
         return res.json()
 
