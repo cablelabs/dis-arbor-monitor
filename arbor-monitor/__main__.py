@@ -68,7 +68,7 @@ async def process_sightline_webhook_notification():
 
     response = get_src_traffic_report(attack_id)
     if response.status_code != 200:
-        msg=f"Error retrieving the source traffic report for attack {attack_id}: {response.reason} ({response.content}))"
+        msg=f"Error retrieving the source traffic report for attack {attack_id}: (HTTP Status: {response.status_code} ({response.reason})) ({response.content}))"
         logger.warning(msg)
         # Returning a 404 so Netscout so we can try to retrieve the report again
         return jsonify({"error": msg}), 404, {'Content-Type': 'application/json'}
@@ -76,29 +76,32 @@ async def process_sightline_webhook_notification():
     src_traffic_report = response.json()
 
     if args.dry_run:
-        logger.info(f"Attack ID {attack_id}: Running in DRY RUN mode - not posting attack")
+        logger.info(f"Attack ID {attack_id}: Running in DRY RUN mode - not posting/saving attack report")
     else:
+        warn_msg = None
         try:
             source_ip_list = send_report_to_dis_server(attack_id, payload, src_traffic_report)
+            total_reports_sent += 1
+            total_source_ips_reported += len(source_ip_list)
+            # TODO: These stats may reflect queuing - need to revisit
         except Exception as ex:
-            msg = f"Caught an exception uploading the report for attack {attack_id} ({ex})"
-            logger.warning(msg)
-            return jsonify({"warning": msg}), 200, {'Content-Type': 'application/json'}
+            warn_msg = f"Caught an exception uploading the report for attack {attack_id} ({ex})"
+            logger.warning(warn_msg)
 
-        total_reports_sent += 1
-        total_source_ips_reported += len(source_ip_list)
         if report_storage_path:
             try:
                 save_attack_report_file(report_storage_path, args.report_store_format,
                                         attack_id, payload, src_traffic_report)
             except Exception as ex:
-                msg = f"Caught an exception saving the report for attack {attack_id} ({ex}) - report uploaded, CONTINUING"
-                logger.warning(msg)
-                # Not returning a 400 here so Netscout doesn't keep attempting to redeliver this attack
-                #  notification (causing potential duplicate reports and backing up Netscout's notify queue)
-                return jsonify({"warning": msg}), 200, {'Content-Type': 'application/json'}
+                warn_msg = f"Caught an exception saving the report for attack {attack_id} ({ex})"
+                logger.warning(warn_msg)
 
-    return f"Thank you Netscout for the DOS report! (attack ID {attack_id})", 200, {'Content-Type': 'text/plain'}
+    if warn_msg:
+        # Not returning a 400 here so Netscout doesn't keep attempting to redeliver this attack
+        #  notification (causing potential duplicate reports and backing up Netscout's notify queue)
+        return jsonify({"warning": warn_msg}), 200, {'Content-Type': 'application/json'}
+    else:
+        return f"Thank you Netscout for the DOS report! (attack ID {attack_id})", 200, {'Content-Type': 'text/plain'}
 
 def check_sightline_api_supported():
     """
@@ -112,7 +115,7 @@ def check_sightline_api_supported():
                             verify=not args.arbor_api_insecure,
                             headers={"X-Arbux-APIToken":args.arbor_api_token})
     if response.status_code != requests.codes.ok:
-        logger.error(f"Error retrieving {response.url}: Status code {response.status_code}")
+        logger.error(f"Error retrieving {response.url}: (HTTP Status: {response.status_code} ({response.reason}))")
         return False
 
     json_response = response.json()
@@ -183,7 +186,7 @@ def send_report_to_dis_server(attack_id, attack_payload, src_traffic_report):
     # TODO: Add accessor for the DIS client base URL so we can log it
     logger.info(f"Attack ID {attack_id}: Sending report to DIS server")
     msg = dis_client.send()
-    logger.info(f"Attack ID {attack_id}: Report sent to DIS server ({msg})")
+    logger.info(f"Attack ID {attack_id}: Report sent/queued to DIS server ({msg})")
 
     return source_ip_list
 
@@ -497,17 +500,21 @@ if args.dry_run:
     logger.info("RUNNING IN DRY-RUN MODE (not connecting/reporting to the DIS server)")
 else:
     dis_client = DisClient(api_key=args.report_consumer_api_key, staged_limit=args.max_queued_reports)
-    dis_client_info = dis_client.get_info()
-    logger.info(f"DIS client name: {dis_client_info.get('name')}")
-    org = dis_client_info.get("organization")
-    logger.info(f"DIS client organization: {org.get('name') if org else 'Unknown'}")
-    logger.info(f"DIS client description: {dis_client_info.get('shortDescription')}")
-    logger.info(f"DIS client contact: {org.get('contactEmail')}")
-    client_type = dis_client_info.get("clientType")
-    logger.info(f"Client type name: {client_type.get('name')}")
-    logger.info(f"Client type maker: {client_type.get('maker')}")
-    logger.info(f"Client type version: {client_type.get('version')}")
-    # TODO: Check the maker (and version?)
+
+    try:
+        dis_client_info = dis_client.get_info()
+        logger.info(f"DIS client name: {dis_client_info.get('name')}")
+        org = dis_client_info.get("organization")
+        logger.info(f"DIS client organization: {org.get('name') if org else 'Unknown'}")
+        logger.info(f"DIS client description: {dis_client_info.get('shortDescription')}")
+        logger.info(f"DIS client contact: {org.get('contactEmail')}")
+        client_type = dis_client_info.get("clientType")
+        logger.info(f"Client type name: {client_type.get('name')}")
+        logger.info(f"Client type maker: {client_type.get('maker')}")
+        logger.info(f"Client type version: {client_type.get('version')}")
+        # TODO: Check the maker (and version?)
+    except Exception as ex:
+        logger.warning(f"Error getting client info from DIS server: {ex}")
 
 # Note: Setting up syslog after logging above here - so the above doesn't go into syslog
 syslog_formatter = logging.Formatter("%(name)s: %(message)s")

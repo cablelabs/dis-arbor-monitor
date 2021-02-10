@@ -35,19 +35,16 @@ class DisClient(object):
         self._staged_limit = staged_limit
         self._events = {}
 
-        res = requests.get(f"{base_url}/client/me?api_key={api_key}")
+    def get_info(self):
+        res = requests.get(f"{self._base_url}/client/me?api_key={self._key}")
 
         if res.status_code == 401:
-            raise Exception(
-                "Not authorized.  Check that your API Key is correct.")
+            raise Exception("Not authorized.  Check that your API Key is correct.")
 
-        if res.status_code >= 400:
-            raise Exception(res.json())
+        if res.status_code != 200:
+            raise Exception(f"DIS server returned (HTTP Status: {res.status_code} ({res.reason})) accessing {self._base_url} ({res.reason})")
 
-        self._me = res.json()
-
-    def get_info(self):
-        return self._me
+        return res.json()
 
     def get_dest(self):
         return self._dest_url
@@ -120,14 +117,14 @@ class DisClient(object):
 
         if 200 <= res.status_code < 400:
             self._events = {}
-            return f"Sent {len(events)} events to {self._base_url} (status {res.status_code} ({res.reason}))"
+            return f"Sent {len(events)} events to {self._base_url} (HTTP Status: {res.status_code} ({res.reason}))"
 
         if 500 <= res.status_code < 600 or res.status_code == 401:
             # Can be remedied on the server side - throw an error but don't clear the queue
-            raise Exception(f"DIS server returned recoverable server error status code {res.status_code} ({res.reason}) - {len(events)} reports queued")
+            raise Exception(f"DIS server returned recoverable server error (HTTP Status: {res.status_code} ({res.reason})) - {len(events)} reports queued") 
 
         if 400 <= res.status_code < 500:
             # Not considered recoverable - so clear the queue
             self._events = {}
-            raise Exception(f"DIS server returned client error status code {res.status_code} ({res.reason})")
+            raise Exception(f"DIS server returned client error (HTTP Status: {res.status_code} ({res.reason})")
 
