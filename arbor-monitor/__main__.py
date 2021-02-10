@@ -68,7 +68,7 @@ async def process_sightline_webhook_notification():
 
     response = get_src_traffic_report(attack_id)
     if response.status_code != 200:
-        msg=f"Error retrieving the source traffic report for attack {attack_id}: {response.reason} ({response.content}))"
+        msg=f"Error retrieving the source traffic report for attack {attack_id}: (HTTP Status: {response.status_code} ({response.reason})) ({response.content}))"
         logger.warning(msg)
         # Returning a 404 so Netscout so we can try to retrieve the report again
         return jsonify({"error": msg}), 404, {'Content-Type': 'application/json'}
@@ -115,7 +115,7 @@ def check_sightline_api_supported():
                             verify=not args.arbor_api_insecure,
                             headers={"X-Arbux-APIToken":args.arbor_api_token})
     if response.status_code != requests.codes.ok:
-        logger.error(f"Error retrieving {response.url}: Status code {response.status_code}")
+        logger.error(f"Error retrieving {response.url}: (HTTP Status: {response.status_code} ({response.reason}))")
         return False
 
     json_response = response.json()
