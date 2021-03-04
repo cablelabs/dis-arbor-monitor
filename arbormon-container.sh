@@ -417,7 +417,7 @@ function docker-run()
         user_command_args=(--user "$as_user":"$as_group")
     fi
 
-    if [ ! -z "$debug" ]; then
+    if [ "$debug" == "True" -o "$debug" == "true" -o "$debug" == "TRUE"]; then
         debug_opt="--debug"
     fi
 
