@@ -13,7 +13,7 @@ script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" >/dev/null 2>&1 && pwd )"
 conf_file=$script_dir/$(basename $shortname .sh).conf
 
 if [ -e $conf_file ]; then
-    echo "Reading from conf file: $conf_file"
+    echo "Reading defaults from conf file: $conf_file"
     source $conf_file
 fi
 
@@ -57,9 +57,10 @@ function print_usage()
     echo "     docker-stop: Stop the $shortname docker container"
     echo "     docker-kill: Kill the $shortname docker container"
     echo "     docker-rm: Delete the $shortname docker container (can recreate with docker-run)"
-    echo "     docker-restart: Restart the $shortname docker container"
-    echo "     docker-update: Kill the container, remove it, update, and restart"
+    echo "     docker-restart: Restart the $shortname docker container (with the original params)"
+    echo "     docker-update: Kill & remove the container, update image from repo, and start container"
     echo "     docker-logs: Show the logs for $shortname docker container"
+    echo "     docker-relaunch: Remove the container and restart (do this after changing params/conf file)"
     echo "     docker-trace: Watch the logs for the $shortname docker container"
     echo "     docker-address: Print the IP addresses for the $shortname docker container"
     echo "     docker-env: List the environment variables for the $shortname docker container"
@@ -104,7 +105,7 @@ function print_usage()
     echo "   [--log-prefix <log prefix string>]"
     echo "       (default \"$DEF_LOG_PREFIX\")"
     echo "   [--log-report-stats <Report stats every x min>]"
-    echo "       (default \"$DEF_PERIODIC_REPORT_MINS\")"
+    echo "       (default \"$DEF_LOG_REPORT_STATS\")"
     echo "   [--report-store-dir <report directory>]"
     echo "       (default \"$DEF_REPORT_STORE_DIR\")"
     echo "   [--report-store-format <"only-source-attributes"|"all-attributes">]"
@@ -436,7 +437,6 @@ function docker-run()
                               "${syslog_command_args[@]}"
                               "${report_store_command_args[@]}"
                               "${report_format_command_args[@]}")
-
     
     exec_options=(--read-only -d --restart unless-stopped)
 
@@ -475,31 +475,38 @@ function docker-run-interactive()
 function docker-rm()
 {
     docker-kill
-    echo "Attempting to remove container \"$container_name\""
+    echo "Removing container \"$container_name\""
     $DOCKER_CMD container rm $container_name
 }
 
 function docker-stop()
 {
-    echo "Attempting to stop container \"$container_name\""
+    echo "Stopping container \"$container_name\""
     $DOCKER_CMD container stop $container_name
 }
 
 function docker-kill()
 {
-    echo "Attempting to kill container \"$container_name\""
+    echo "Killing container \"$container_name\""
     $DOCKER_CMD container kill $container_name
 }
 
 function docker-restart()
 {
-    echo "Attempting to restart container \"$container_name\""
+    echo "Restart container \"$container_name\""
     $DOCKER_CMD container restart $container_name
+}
+
+function docker-relaunch()
+{
+    docker-rm
+    sleep 1
+    docker-run
 }
 
 function docker-update()
 {
-    echo "Attempting to update container image \"$container_name\""
+    echo "Updating container image \"$container_name\""
     docker-rm
     sleep 1
     docker-pull
@@ -509,7 +516,7 @@ function docker-update()
 function docker-logs()
 {
     echo "Showing logs for container \"$container_name\""
-    $DOCKER_CMD container logs --timestamps $container_name
+    $DOCKER_CMD container logs --timestamps $container_name 2>&1 | less
 }
 
 function docker-trace()
