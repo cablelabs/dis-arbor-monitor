@@ -105,7 +105,7 @@ function print_usage()
     echo "   [--log-prefix <log prefix string>]"
     echo "       (default \"$DEF_LOG_PREFIX\")"
     echo "   [--log-report-stats <Report stats every x min>]"
-    echo "       (default \"$DEF_PERIODIC_REPORT_MINS\")"
+    echo "       (default \"$DEF_LOG_REPORT_STATS\")"
     echo "   [--report-store-dir <report directory>]"
     echo "       (default \"$DEF_REPORT_STORE_DIR\")"
     echo "   [--report-store-format <"only-source-attributes"|"all-attributes">]"
@@ -516,7 +516,7 @@ function docker-update()
 function docker-logs()
 {
     echo "Showing logs for container \"$container_name\""
-    $DOCKER_CMD container logs --timestamps $container_name
+    $DOCKER_CMD container logs --timestamps $container_name 2>&1 | less
 }
 
 function docker-trace()
