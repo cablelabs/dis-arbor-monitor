@@ -29,14 +29,19 @@ class IpAttribute(BaseModel):
 class DisClient(object):
     """SDK for the /data route for the DIS system.  Implements the REST API. """
 
-    def __init__(self, api_key: str, base_url: HttpUrl = "https://api.dissarm.net/v1", staged_limit=0):
+    def __init__(self, api_key: str, base_url: HttpUrl = "https://api.dissarm.net/v1",
+                 http_proxy=None, staged_limit=0):
         self._key = api_key
         self._base_url = base_url
+        if http_proxy:
+            self._http_proxies = {'http': http_proxy, 'https': http_proxy}
+        else:
+            self._http_proxies = None
         self._staged_limit = staged_limit
         self._events = {}
 
     def get_info(self):
-        res = requests.get(f"{self._base_url}/client/me?api_key={self._key}")
+        res = requests.get(f"{self._base_url}/client/me?api_key={self._key}", proxies=self._http_proxies)
 
         if res.status_code == 401:
             raise Exception("Not authorized.  Check that your API Key is correct.")
@@ -113,7 +118,8 @@ class DisClient(object):
         for k, v in self._events.items():
             events.append(v)
 
-        res = requests.post("{0}/data?api_key={1}".format(self._base_url, self._key), json={"events": events})
+        res = requests.post("{0}/data?api_key={1}".format(self._base_url, self._key),
+                            json={"events": events}, proxies=self._http_proxies)
 
         if 200 <= res.status_code < 400:
             self._events = {}

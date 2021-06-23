@@ -403,7 +403,7 @@ arg_parser.add_argument ('--arbor-api-token', "-aat,", required=not arg_default,
                          action='store', type=str, default=arg_default, metavar="api_token",
                          help="Specify the Arbor API token to use for REST calls "
                               "(or DIS_ARBORMON_REST_API_TOKEN)")
-arg_parser.add_argument ('--arbor-api-insecure', "-aai,", required=False,
+arg_parser.add_argument ('--arbor-api-insecure', "-aai", required=False,
                          action='store_true', default=os.environ.get('DIS_ARBORMON_REST_API_INSECURE',False),
                          help="Disable cert checks when invoking Arbor SP API REST calls "
                               "(or DIS_ARBORMON_REST_API_INSECURE)")
@@ -412,10 +412,15 @@ arg_parser.add_argument ('--arbor-api-insecure', "-aai,", required=False,
 #                          help="Specifies the API prefix to use for submitting attack reports"
 #                               "(or DIS_ARBORMON_REPORT_CONSUMER_URL)")
 arg_default=os.environ.get('DIS_ARBORMON_REPORT_API_KEY')
-arg_parser.add_argument ('--report-consumer-api-key', "-rckey,", required=not arg_default,
+arg_parser.add_argument ('--report-consumer-api-key', "-rckey", required=not arg_default,
                          action='store', type=str, default=arg_default, metavar="api_key",
                          help="Specify the API key to use for submitting attack reports "
                               "(or DIS_ARBORMON_REPORT_API_KEY)")
+arg_parser.add_argument ('--http-proxy', "-hpu,", required=False, action='store',
+                         type=str, metavar="http_proxy",
+                         default=os.environ.get('DIS_ARBORMON_HTTP_PROXY'),
+                         help="Specify the HTTP/HTTPS proxy URL for sending reports to the DIS server "
+                              "(or DIS_ARBORMON_HTTP_PROXY). e.g. 'http://10.0.1.11:1234', 'https://proxy.acme.com:8080'")
 arg_parser.add_argument ('--max-queued-reports', "-rcmqr,", required=False, action='store',
                          type=int, metavar="max_num_queued",
                          default=os.environ.get('DIS_ARBORMON_MAX_QUEUED_REPORTS', 0),
@@ -489,6 +494,7 @@ logger.info(f"Arbor API prefix: {args.arbor_api_prefix}")
 logger.info(f"Arbor API token: ... ...{args.arbor_api_token[-4:] if args.arbor_api_token else ''}")
 logger.info(f"DIS server API key: ... ...{args.report_consumer_api_key[-4:] if args.report_consumer_api_key else ''}")
 logger.info(f"DIS server max queued reports: {args.max_queued_reports}")
+logger.info(f"HTTP Proxy: {args.http_proxy}")
 logger.info(f"Periodic report stats logging interval (minutes): {args.log_report_stats}")
 logger.info(f"Syslog UDP server: {args.syslog_server}")
 logger.info(f"Syslog TCP server: {args.syslog_tcp_server}")
@@ -499,7 +505,8 @@ logger.info(f"Report storage format: {args.report_store_format}")
 if args.dry_run:
     logger.info("RUNNING IN DRY-RUN MODE (not connecting/reporting to the DIS server)")
 else:
-    dis_client = DisClient(api_key=args.report_consumer_api_key, staged_limit=args.max_queued_reports)
+    dis_client = DisClient(api_key=args.report_consumer_api_key, staged_limit=args.max_queued_reports,
+                           http_proxy=args.http_proxy)
 
     try:
         dis_client_info = dis_client.get_info()

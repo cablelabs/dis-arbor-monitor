@@ -94,6 +94,8 @@ function print_usage()
     echo "       (default \"$DEF_ARBOR_REST_API_INSECURE\")"
     echo "   [--report-consumer-api-key <API key for reporting>]"
     echo "       (default \"$DEF_REPORT_API_KEY\")"
+    echo "   [--http-proxy <HTTP proxy URL>]"
+    echo "       (default \"$DEF_REPORT_HTTP_PROXY\")"
     echo "   [--syslog-server <syslog UDP server or server:port>]"
     echo "       (default \"$DEF_SYSLOG_SERVER\")"
     echo "   [--syslog-tcp-server <syslog TCP server or server:port>]"
@@ -130,6 +132,7 @@ function process_arguments()
     arbor_rest_api_token="$DEF_ARBOR_REST_API_TOKEN"
     arbor_rest_api_insecure="$DEF_ARBOR_REST_API_INSECURE"
     report_consumer_api_key="$DEF_REPORT_CONSUMER_API_KEY"
+    report_consumer_http_proxy="$DEF_REPORT_CONSUMER_HTTP_PROXY"
     max_queued_reports="$DEF_MAX_QUEUED_REPORTS"
     log_report_stats="$DEF_LOG_REPORT_STATS"
     log_prefix="$DEF_LOG_PREFIX"
@@ -199,6 +202,10 @@ function process_arguments()
         elif [ "$opt_name" == "--report-consumer-api-key" ]; then
             shift
             report_consumer_api_key="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--report-consumer-http-proxy" ]; then
+            shift
+            report_consumer_http_proxy="$1"
             shift || bailout_with_usage "missing parameter to $opt_name"
         elif [ "$opt_name" == "--max-queued-reports" ]; then
             shift
@@ -286,6 +293,7 @@ function process_arguments()
         echo "arbor_rest_api_token: $arbor_rest_api_token"
         echo "arbor_rest_api_insecure: $arbor_rest_api_insecure"
         echo "report_consumer_api_key: $report_consumer_api_key"
+        echo "report_consumer_http_proxy: $report_consumer_http_proxy"
         echo "log_report_stats: $log_report_stats"
         echo "syslog_server: $syslog_server"
         echo "syslog_tcp_server: $syslog_tcp_server"
@@ -323,6 +331,10 @@ function docker-run()
 
     if [ "$arbor_rest_api_insecure" == "True" ]; then
         arbor_rest_api_insecure_opt="--arbor-api-insecure"
+    fi
+
+    if [ ! -z "$report_consumer_http_proxy" ]; then
+        report_consumer_http_proxy_opt="--http-proxy $report_consumer_http_proxy"
     fi
 
     if [ ! -z "$webhook_token" ]; then
@@ -430,6 +442,7 @@ function docker-run()
                               --arbor-api-token "$arbor_rest_api_token"
                               $arbor_rest_api_insecure_opt
                               --report-consumer-api-key "$report_consumer_api_key"
+                              $report_consumer_http_proxy_opt
                               $log_prefix_opt
                               $log_report_opt
                               $max_queued_reports_opt
