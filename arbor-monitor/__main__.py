@@ -420,7 +420,7 @@ arg_parser.add_argument ('--http-proxy', "-hpu,", required=False, action='store'
                          type=str, metavar="http_proxy",
                          default=os.environ.get('DIS_ARBORMON_HTTP_PROXY'),
                          help="Specify the HTTP/HTTPS proxy URL for sending reports to the DIS server "
-                              "(or DIS_ARBORMON_HTTP_PROXY). e.g. 'http://10.0.1.11:1234'")
+                              "(or DIS_ARBORMON_HTTP_PROXY). e.g. 'http://10.0.1.11:1234', 'https://proxy.acme.com:8080'")
 arg_parser.add_argument ('--max-queued-reports', "-rcmqr,", required=False, action='store',
                          type=int, metavar="max_num_queued",
                          default=os.environ.get('DIS_ARBORMON_MAX_QUEUED_REPORTS', 0),
