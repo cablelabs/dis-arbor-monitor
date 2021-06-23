@@ -333,11 +333,9 @@ function docker-run()
         arbor_rest_api_insecure_opt="--arbor-api-insecure"
     fi
 
-
     if [ ! -z "$report_consumer_http_proxy" ]; then
         report_consumer_http_proxy_opt="--http-proxy $report_consumer_http_proxy"
     fi
-
 
     if [ ! -z "$webhook_token" ]; then
         webhook_token_opt="--webhook-token $webhook_token"
