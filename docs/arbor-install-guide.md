@@ -402,32 +402,32 @@ Commit the config once the changes are complete:
 
 4. **Configure webhook notification limits to prevent excessive queuing of webhook notifications.**
 
-Arbor Sightline will only consider a webhook "invoked" if it’s able to POST
-the webhook notification body to the configured webhook endpoint URI(s) and
-the endpoint returns a HTTP 200 (success) status code. If the webhook isn’t
-successfully invoked, Sightline will attempt to invoke the endpoint again,
-after a period, and will continue to do so until the endpoint is
-successfully invoked.
+    Arbor Sightline will only consider a webhook "invoked" if it’s able to POST
+    the webhook notification body to the configured webhook endpoint URI(s) and
+    the endpoint returns a HTTP 200 (success) status code. If the webhook isn’t
+    successfully invoked, Sightline will attempt to invoke the endpoint again,
+    after a period, and will continue to do so until the endpoint is
+    successfully invoked.
 
-If there’s a concern that Sightline won’t be able to connect to the DIS
-client due to network connectivity issues or regular maintenance, you may
-want to configure Sightline to limit its retry behavior – since it can
-impact the memory usage and performance of the system.
+    If there’s a concern that Sightline won’t be able to connect to the DIS
+    client due to network connectivity issues or regular maintenance, you may
+    want to configure Sightline to limit its retry behavior – since it can
+    impact the memory usage and performance of the system.
 
-The following options can be set to control the notification behavior via
-the Arbor Sightline API:
+    The following options can be set to control the notification behavior via
+    the Arbor Sightline API:
 
--   The "notification webhooks retry_count_limit" and "notification webhooks
-    retry_count_max set" variables will limit the number of times a webhook will
-    be invoked for a particular attack report
+    -   The "notification webhooks retry_count_limit" and "notification webhooks
+        retry_count_max set" variables will limit the number of times a webhook will
+        be invoked for a particular attack report
 
--   The "notification webhooks retry_seconds_limit" and "notification webhooks
-    retry_seconds_max" will control the retry frequency for webhook
-    notifications for a particular attack report
+    -   The "notification webhooks retry_seconds_limit" and "notification webhooks
+        retry_seconds_max" will control the retry frequency for webhook
+        notifications for a particular attack report
 
-For example, to set the webhook notification to perform no more than 10
-notifications per attack – with 1 minute between notifications, the
-following commands can be invoked on the Sightline CLI:
+    For example, to set the webhook notification to perform no more than 10
+    notifications per attack – with 1 minute between notifications, the
+    following commands can be invoked on the Sightline CLI:
 
 ## 6. Validation
 
