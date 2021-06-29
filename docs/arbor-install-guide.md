@@ -44,11 +44,15 @@ Threat Mitigation System User Guide*.
 
 From the Netscout CLI, enter the following command:
 
-`/ services aaa local apitoken generate user_name "token_description"`
+```
+/ services aaa local apitoken generate user_name "token_description"
+```
 
 If an API token exists (or if you’re not sure one exists), use:
 
-`/ services aaa local apitoken show`
+```
+/ services aaa local apitoken show
+```
 
 To show any active API tokens. Make note of the Arbor REST API token for the
 steps below.
@@ -308,15 +312,21 @@ For installing the DIS Arbor Monitor/Client, perform the following:
 
 4.  **Download the Docker image:**
 
-    `/etc/dis-arbor-monitor/arbormon-container.sh docker-pull`
+    ```
+    /etc/dis-arbor-monitor/arbormon-container.sh docker-pull
+    ```
 
 5.  **Start the DIS Arbor Monitor Docker container:**
 
-    `/etc/dis-arbor-monitor/arbormon-container.sh docker-run`
+    ```
+    /etc/dis-arbor-monitor/arbormon-container.sh docker-run
+    ```
 
 6.  **Check for successful startup:**
 
-    `/etc/dis-arbor-monitor/arbormon-container.sh docker-logs`
+    ```
+    /etc/dis-arbor-monitor/arbormon-container.sh docker-logs
+    ```
 
     On successful startup, the logs should start with something similar to:
 
@@ -394,7 +404,7 @@ following:
 
     ![](resources/save-notification-rule.png)
 
-Commit the config once the changes are complete:
+    Commit the config once the changes are complete:
 
     ![](resources/commit-config.png)
 
@@ -435,14 +445,14 @@ Confirmation of the invocation of the configured webhook can be performed by
 examining the DIS Arbor Monitor/Client log. The log can be retrieved by running
 the following command:
 
-`/etc/dis-arbor-monitor/arbormon-container.sh docker-logs`
+```
+/etc/dis-arbor-monitor/arbormon-container.sh docker-logs
+```
 
 When an attack is detected, the first indication you will see in the DIS Arbor
 monitor/client log will be an entry of the form:
 
-```
-INFO Received notification of ONGOING attack (ID: 6831)
-```
+`INFO Received notification of ONGOING attack (ID: 6831)`
 
 Then once the attack is completed – and the attack metadata and source IP
 addresses have been determined – you should see log entries of the form:
@@ -463,11 +473,15 @@ corresponding log entry, then check the configuration. Or to verify the webhook
 address is correct, you can use curl to perform a GET on the webhook URI and
 verify the monitor/client can be contacted. For example:
 
-`curl http://arbormon-001.acme.com`
+```
+curl http://arbormon-001.acme.com
+```
 
 or if custom certs are being used with https on a custom port:
 
-`curl --insecure https://arbormon-001.acme.com:8443`
+```
+curl --insecure https://arbormon-001.acme.com:8443
+```
 
 If the URI is correct, the DIS Arbor Monitor log should print an entry when it
 rejects the GET request:
