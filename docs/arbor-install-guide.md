@@ -107,7 +107,9 @@ For installing the DIS Arbor Monitor/Client, perform the following:
 
 3.  **Configure the settings for your environment:**
 
-    `sudo vim /etc/dis-arbor-monitor/arbormon-container.conf`
+    ```
+    sudo vim /etc/dis-arbor-monitor/arbormon-container.conf
+    ```
 
     Which should contain settings for the following variables:
 
