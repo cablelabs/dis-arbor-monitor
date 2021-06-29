@@ -347,7 +347,7 @@ following:
 
 1.  **Setup a Managed Object with suitable DDoS notification limits:**
 
-![](resources/managed-objects.png)
+>   ![](resources/managed-objects.png)
 
 ![](resources/add-managed-objects.png)
 
