@@ -349,21 +349,21 @@ following:
 
     ![](resources/managed-objects.png)
 
--   ![](resources/add-managed-objects.png)
+    ![](resources/add-managed-objects.png)
 
-![](resources/arbor-configuration.png)
+    ![](resources/arbor-configuration.png)
 
-![](resources/host-detection.png)
+    ![](resources/host-detection.png)
 
-![](resources/save-host-detection.png)
+    ![](resources/save-host-detection.png)
 
 2.  **Create a notification group:**
 
-![](resources/arbor-groups.png)
+    ![](resources/arbor-groups.png)
 
-![](resources/add-notification-group.png)
+    ![](resources/add-notification-group.png)
 
-![](resources/save-notification-group.png)
+    ![](resources/save-notification-group.png)
 
 Webhook "URI" provided here is just an example. This field must be
 coordinated with the configuration of the DIS Monitor/Client as described in
@@ -392,13 +392,13 @@ will not be encrypted on http connections.
 
 3. **Setup a notification rule for the Managed Object setup above to utilize the Notification Group containing the webhook:**
 
-![](resources/save-notification-rule.png)
+    ![](resources/save-notification-rule.png)
 
 Commit the config once the changes are complete:
 
-![](resources/commit-config.png)
+    ![](resources/commit-config.png)
 
-![](resources/config-information.png)
+    ![](resources/config-information.png)
 
 4. **Configure webhook notification limits to prevent excessive queuing of webhook notifications.**
 
