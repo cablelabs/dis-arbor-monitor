@@ -90,96 +90,96 @@ The DIS Arbor Monitor/Client requires the following:
 
 For installing the DIS Arbor Monitor/Client, perform the following:
 
-1.  Retrieve the latest Docker management script for the DDOS Info Sharing
-    client:
+1.  **Retrieve the latest Docker management script for the DDOS Info Sharing client:**
+    
+    ```
+    wget https://raw.githubusercontent.com/cablelabs/dis-arbor-monitor/master/arbormon-container.sh
+    wget https://raw.githubusercontent.com/cablelabs/dis-arbor-monitor/master/arbormon-container.conf
+    ```
 
-    `wget https://raw.githubusercontent.com/cablelabs/dis-arbor-monitor/master/arbormon-container.sh`
+2.  **Install the script:**
 
-    `wget https://raw.githubusercontent.com/cablelabs/dis-arbor-monitor/master/arbormon-container.conf`
+    ```
+    sudo mkdir /etc/dis-arbor-monitor/
+    sudo install -v -o root -m 755 -D -t /etc/dis-arbor-monitor/arbormon-container.sh
+    sudo install -v -o root -m 600 -D -C -t /etc/dis-arbor-monitor/arbormon-container.conf
+    ```
 
-2.  Install the script:
-
-    `sudo mkdir /etc/dis-arbor-monitor/`
-
-    `sudo install -v -o root -m 755 -D -t /etc/dis-arbor-monitor/arbormon-container.sh`
-
-    `sudo install -v -o root -m 600 -D -C -t /etc/dis-arbor-monitor/arbormon-container.conf`
-
-3.  Configure the settings for your environment:
+3.  **Configure the settings for your environment:**
 
     `sudo vim /etc/dis-arbor-monitor/arbormon-container.conf`
 
     Which should contain settings for the following variables:
 
-    -   DOCKER_CMD to the command to execute to invoke Docker (just “docker” if the
+    -   `DOCKER_CMD` to the command to execute to invoke Docker (just “docker” if the
         user is already in the “docker” group or “sudo docker” if the user is not)
 
-    -   DEF_IMAGE_LOCATION/TAG to whatever values are provided by the DIS project
+    -   `DEF_IMAGE_LOCATION/TAG` to whatever values are provided by the DIS project
         integrator
 
-    -   DEF_CONTAINER_NAME should be set to “dis-arbor-monitor-service”
+    -   `DEF_CONTAINER_NAME` should be set to “dis-arbor-monitor-service”
 
-    -   DEF_DEBUG can be set to “True” to enable debug logging. The default is for
+    -   `DEF_DEBUG` can be set to “True” to enable debug logging. The default is for
         debug logging to be disabled.
 
-    -   DEF_TLS_CERT_CHAIN_FILE/KEY_FILE should be set to the paths containing the
+    -   `DEF_TLS_CERT_CHAIN_FILE/KEY_FILE` should be set to the paths containing the
         TLS/HTTPS certificate and private key for the server running the monitor.
         These should only be set if (a) the Arbor web hook is setup with an https
         URI, and (b) when a HTTPS web proxy isn’t being used to handle the HTTPS
         connection (e.g. nginx)
 
-    -   DEF_BIND_PORT/ADDRESS need to be set in accordance with how the Arbor
+    -   `DEF_BIND_PORT/ADDRESS` need to be set in accordance with how the Arbor
         webhook is setup. If the webhook is “http” (with the default port) than
         these should be either “0.0.0.0” and “80” or to be more explicit, the IP
         address of the Arbor-accessible interface and “80”. If a https proxy is
         used, these should be set to “127.0.0.1” and some arbitrary port, such as
         “8080”.
 
-    -   DEF_ARBOR_REST_API_PREFIX should be set to the http or https URI prefix for
+    -   `DEF_ARBOR_REST_API_PREFIX` should be set to the http or https URI prefix for
         the Arbor NetScout REST API. Usually this will just be set to a URI of the
         form “<https://arbor-netscout-hostname.acme.com/>”
 
-    -   DEF_ARBOR_REST_API_TOKEN should be set to the key setup in the previous
+    -   `DEF_ARBOR_REST_API_TOKEN` should be set to the key setup in the previous
         section (see section ”Create a sightline API key”)
 
-    -   DEF_REPORT_CONSUMER_API_KEY is set to the API key created in the previous
+    -   `DEF_REPORT_CONSUMER_API_KEY` is set to the API key created in the previous
         section (see section “Create an API key for the Monitor/Client”)
 
-    -   DEF_REPORT_CONSUMER_HTTP_PROXY can be set to the URI of an HTTP/HTTPS proxy.
+    -   `DEF_REPORT_CONSUMER_HTTP_PROXY` can be set to the URI of an HTTP/HTTPS proxy.
         (e.g. “http://10.0.1.11:1234” or “https://proxy.acme.com:8080”)
 
-    -   DIS_ARBORMON_WEBHOOK_TOKEN can be set to a random string which is provided
+    -   `DIS_ARBORMON_WEBHOOK_TOKEN` can be set to a random string which is provided
         in the webhook URI as a way to authenticate the webhook invocation. e.g.
         “openssl rand -hex 10”
 
-    -   DEF_MAX_QUEUED_REPORTS is set to the number of attack reports that the
+    -   `DEF_MAX_QUEUED_REPORTS` is set to the number of attack reports that the
         client will queue if/when communication is lost with the DIS backend server.
         If unset, the client will queue indefinitely.
 
-    -   DEF_SYSLOG_SERVER can be set to the hostname/address of a syslog server
+    -   `DEF_SYSLOG_SERVER` can be set to the hostname/address of a syslog server
         listening for syslog events on UDP port 514 (e.g. “logserve.acme.com”) or to
         the port designated after a “:” (e.g. “logserve.acme.com:5514”). Any
         INFO-level logging (or higher) will be sent to the designated SYSLOG server
         via UDP (in addition to any other syslog destinations set).
 
-    -   DEF_SYSLOG_TCP_SERVER can be set to the hostname/address of a syslog server
+    -   `DEF_SYSLOG_TCP_SERVER` can be set to the hostname/address of a syslog server
         listening for syslog events on TCP port 601 (e.g. “logserve.acme.com”) or to
         the port designated after a “:” (e.g. “logserve.acme.com:5601”). Any
         INFO-level logging (or higher) will be sent to the designated SYSLOG server
         via TCP (in addition to any other syslog destinations set).
 
-    -   DEF_SYSLOG_SOCKET can be set to the filename of a syslog socket file. Any
+    -   `DEF_SYSLOG_SOCKET` can be set to the filename of a syslog socket file. Any
         INFO-level logging (or higher) will be sent to the designated SYSLOG socket
         (in addition to any other syslog destinations set).
 
-    -   DEF_SYSLOG_FACILITY can be set to the desired syslog facility code (an
+    -   `DEF_SYSLOG_FACILITY` can be set to the desired syslog facility code (an
         integer). If unset any syslog logging will be logged to facility LOG_USER.
 
-    -   DEF_LOG_PREFIX can be set to an arbitrary string that will prefix all
+    -   `DEF_LOG_PREFIX` can be set to an arbitrary string that will prefix all
         logging messages from the client – both within the docker container and
         messages logged via syslog
 
-    -   DEF_LOG_REPORT_STATS can be set to a positive integer representing the
+    -   `DEF_LOG_REPORT_STATS` can be set to a positive integer representing the
         frequency (in minutes) where the client will periodically perform INFO-level
         logging reporting the number of attack events and source IP addresses
         reported during the last time period. e.g.
@@ -187,7 +187,7 @@ For installing the DIS Arbor Monitor/Client, perform the following:
         ```
         STATUS REPORT: Sent 11 reports (with 1789 source IPs) in 5.00 minutes
         STATUS REPORT: Sent 9 reports (with 2312 source IPs) in 5.00 minutes
-        SATUS REPORT: Sent 17 reports (with 2812 source IPs) in 5.01 minutes 
+        STATUS REPORT: Sent 17 reports (with 2812 source IPs) in 5.01 minutes 
         ```
 
     -   DEF_REPORT_STORE_DIR can be set to a directory where a local report file
@@ -304,15 +304,15 @@ For installing the DIS Arbor Monitor/Client, perform the following:
     executing the script to have permissions set to allow access to the file or to
     use “sudo” to execute the script.
 
-4.  Download the Docker image:
+4.  **Download the Docker image:**
 
     `/etc/dis-arbor-monitor/arbormon-container.sh docker-pull`
 
-5.  Start the DIS Arbor Monitor Docker container:
+5.  **Start the DIS Arbor Monitor Docker container:**
 
     `/etc/dis-arbor-monitor/arbormon-container.sh docker-run`
 
-6.  Check for successful startup:
+6.  **Check for successful startup:**
 
     `/etc/dis-arbor-monitor/arbormon-container.sh docker-logs`
 
@@ -343,7 +343,7 @@ For installing the DIS Arbor Monitor/Client, perform the following:
 To configure Arbor NetScout to notify the DIS monitor/client, perform the
 following:
 
-1.  Setup a Managed Object with suitable DDoS notification limits:
+1.  **Setup a Managed Object with suitable DDoS notification limits:**
 
 ![](resources/managed-objects.png)
 
@@ -355,7 +355,7 @@ following:
 
 ![](resources/save-host-detection.png)
 
-2.  Create a notification group:
+2.  **Create a notification group:**
 
 ![](resources/arbor-groups.png)
 
@@ -388,7 +388,7 @@ only allow webhook invocations with the provided token. Note that this form
 is only reliable when used with https – since the URI (including the token)
 will not be encrypted on http connections.
 
-3. Setup a notification rule for the Managed Object setup above to utilize the Notification Group containing the webhook:
+3. **Setup a notification rule for the Managed Object setup above to utilize the Notification Group containing the webhook:**
 
 ![](resources/save-notification-rule.png)
 
@@ -398,7 +398,7 @@ Commit the config once the changes are complete:
 
 ![](resources/config-information.png)
 
-4. Configure webhook notification limits to prevent excessive queuing of webhook notifications.
+4. **Configure webhook notification limits to prevent excessive queuing of webhook notifications.**
 
 Arbor Sightline will only consider a webhook “invoked” if it’s able to POST
 the webhook notification body to the configured webhook endpoint URI(s) and
