@@ -17,7 +17,7 @@ Monitor/Client for Sightline 9.x systems.
 ## 2. Create an API key for the Monitor/Client
 
 Using the provided credentials, go to <https://dissarm.net/clients> and select
-“Provision New Client.”
+"Provision New Client."
 
 NOTE: If you don’t already have credentials for the DIS management system,
 CableLabs will create one or more logins for your organization and provide
@@ -29,17 +29,17 @@ initial credentials.
 
 ![](resources/client-info.png)
 
-Once completed, make note of the “API Key” to use below.
+Once completed, make note of the "API Key" to use below.
 
-Note: Disregard the “Installation” instructions provided in the UI for the
+Note: Disregard the "Installation" instructions provided in the UI for the
 time-being. These will be updated to reflect these installation instructions in
 a future update of the DIS backend.
 
 ## 3. Create a sightline API key
 
 If you don’t already have an API key setup, generating an Arbor API key requires
-access to the Arbor Sightline CLI. This is described in the “Enabling Customers
-to View Sightline Data in the Web Services API” section of the *Sightline and
+access to the Arbor Sightline CLI. This is described in the "Enabling Customers
+to View Sightline Data in the Web Services API" section of the *Sightline and
 Threat Mitigation System User Guide*.
 
 From the Netscout CLI, enter the following command:
@@ -113,15 +113,15 @@ For installing the DIS Arbor Monitor/Client, perform the following:
 
     Which should contain settings for the following variables:
 
-    -   `DOCKER_CMD` to the command to execute to invoke Docker (just “docker” if the
-        user is already in the “docker” group or “sudo docker” if the user is not)
+    -   `DOCKER_CMD` to the command to execute to invoke Docker (just "docker" if the
+        user is already in the "docker" group or "sudo docker" if the user is not)
 
     -   `DEF_IMAGE_LOCATION/TAG` to whatever values are provided by the DIS project
         integrator
 
-    -   `DEF_CONTAINER_NAME` should be set to “dis-arbor-monitor-service”
+    -   `DEF_CONTAINER_NAME` should be set to "dis-arbor-monitor-service"
 
-    -   `DEF_DEBUG` can be set to “True” to enable debug logging. The default is for
+    -   `DEF_DEBUG` can be set to "True" to enable debug logging. The default is for
         debug logging to be disabled.
 
     -   `DEF_TLS_CERT_CHAIN_FILE/KEY_FILE` should be set to the paths containing the
@@ -131,42 +131,42 @@ For installing the DIS Arbor Monitor/Client, perform the following:
         connection (e.g. nginx)
 
     -   `DEF_BIND_PORT/ADDRESS` need to be set in accordance with how the Arbor
-        webhook is setup. If the webhook is “http” (with the default port) than
-        these should be either “0.0.0.0” and “80” or to be more explicit, the IP
-        address of the Arbor-accessible interface and “80”. If a https proxy is
-        used, these should be set to “127.0.0.1” and some arbitrary port, such as
-        “8080”.
+        webhook is setup. If the webhook is "http" (with the default port) than
+        these should be either "0.0.0.0" and "80" or to be more explicit, the IP
+        address of the Arbor-accessible interface and "80". If a https proxy is
+        used, these should be set to "127.0.0.1" and some arbitrary port, such as
+        "8080".
 
     -   `DEF_ARBOR_REST_API_PREFIX` should be set to the http or https URI prefix for
         the Arbor NetScout REST API. Usually this will just be set to a URI of the
-        form “<https://arbor-netscout-hostname.acme.com/>”
+        form "<https://arbor-netscout-hostname.acme.com/>"
 
     -   `DEF_ARBOR_REST_API_TOKEN` should be set to the key setup in the previous
-        section (see section ”Create a sightline API key”)
+        section (see section "Create a sightline API key")
 
     -   `DEF_REPORT_CONSUMER_API_KEY` is set to the API key created in the previous
-        section (see section “Create an API key for the Monitor/Client”)
+        section (see section "Create an API key for the Monitor/Client")
 
     -   `DEF_REPORT_CONSUMER_HTTP_PROXY` can be set to the URI of an HTTP/HTTPS proxy.
-        (e.g. “http://10.0.1.11:1234” or “https://proxy.acme.com:8080”)
+        (e.g. "http://10.0.1.11:1234" or "https://proxy.acme.com:8080")
 
     -   `DIS_ARBORMON_WEBHOOK_TOKEN` can be set to a random string which is provided
         in the webhook URI as a way to authenticate the webhook invocation. e.g.
-        “openssl rand -hex 10”
+        "openssl rand -hex 10"
 
     -   `DEF_MAX_QUEUED_REPORTS` is set to the number of attack reports that the
         client will queue if/when communication is lost with the DIS backend server.
         If unset, the client will queue indefinitely.
 
     -   `DEF_SYSLOG_SERVER` can be set to the hostname/address of a syslog server
-        listening for syslog events on UDP port 514 (e.g. “logserve.acme.com”) or to
-        the port designated after a “:” (e.g. “logserve.acme.com:5514”). Any
+        listening for syslog events on UDP port 514 (e.g. "logserve.acme.com") or to
+        the port designated after a ":" (e.g. "logserve.acme.com:5514"). Any
         INFO-level logging (or higher) will be sent to the designated SYSLOG server
         via UDP (in addition to any other syslog destinations set).
 
     -   `DEF_SYSLOG_TCP_SERVER` can be set to the hostname/address of a syslog server
-        listening for syslog events on TCP port 601 (e.g. “logserve.acme.com”) or to
-        the port designated after a “:” (e.g. “logserve.acme.com:5601”). Any
+        listening for syslog events on TCP port 601 (e.g. "logserve.acme.com") or to
+        the port designated after a ":" (e.g. "logserve.acme.com:5601"). Any
         INFO-level logging (or higher) will be sent to the designated SYSLOG server
         via TCP (in addition to any other syslog destinations set).
 
@@ -199,10 +199,10 @@ For installing the DIS Arbor Monitor/Client, perform the following:
     -   `DEF_REPORT_STORE_FORMAT` can be set to either "only-source-attributes" or
         "all-attributes". If not set, the default is "only-source-attributes"
 
-        The “only-source-attributes” format includes only information related to the
+        The "only-source-attributes" format includes only information related to the
         attack source – omitting data such as the target IP, source router, and other
         information not related to the attack source. Here’s an example of the
-        “only-source-attributes” format:
+        "only-source-attributes" format:
 
         ```
         {
@@ -230,11 +230,11 @@ For installing the DIS Arbor Monitor/Client, perform the following:
         } 
         ```
 
-        The “all-attributes” format includes additional attributes not related to the
+        The "all-attributes" format includes additional attributes not related to the
         attack source – attributes which are not reported to the DIS backend but which
         may be of interest/use of local facilities. For example the attack target and
         relevant router names will be included in the report. Here’s an example of the
-        “all-attributes” format
+        "all-attributes" format
 
         ```
         {
@@ -274,8 +274,8 @@ For installing the DIS Arbor Monitor/Client, perform the following:
     Here’s an example of the */etc/dis-arbor-monitor/arbormon-container.conf* file:
 
     ```
-    DOCKER_CMD=”sudo docker”
-    DEF_IMAGE_LOCATION=”community.cablelabs.com:4567/dis-docker/dis-arbor-monitor”
+    DOCKER_CMD="sudo docker"
+    DEF_IMAGE_LOCATION="community.cablelabs.com:4567/dis-docker/dis-arbor-monitor"
     DEF_IMAGE_TAG=latest
     DEF_CONTAINER_NAME=dis-arbor-monitor-service
     DEF_TLS_CERT_CHAIN_FILE=/etc/dis-arbor-monitor/combined.cer 
@@ -301,10 +301,10 @@ For installing the DIS Arbor Monitor/Client, perform the following:
     ```
 
     NOTE: This conf file should have permissions set to prevent it from being
-    world-readable if the system is multi-user (e.g. “chmod o-rw
-    /etc/dis-arbor-monitor/arbormon-container.conf”). This will require the user
+    world-readable if the system is multi-user (e.g. "chmod o-rw
+    /etc/dis-arbor-monitor/arbormon-container.conf"). This will require the user
     executing the script to have permissions set to allow access to the file or to
-    use “sudo” to execute the script.
+    use "sudo" to execute the script.
 
 4.  **Download the Docker image:**
 
@@ -365,22 +365,22 @@ following:
 
 ![](resources/save-notification-group.png)
 
-Webhook “URI” provided here is just an example. This field must be
+Webhook "URI" provided here is just an example. This field must be
 coordinated with the configuration of the DIS Monitor/Client as described in
 Section 4 (Install the DDoS Info Sharing (DIS) Monitor/Client (v2)).
 
 If the DIS client is setup to listen for http notifications (with no TLS
-cert configured), then an URI of the form “http://fqdn-or-ip/dis/sl-webhook”
+cert configured), then an URI of the form "http://fqdn-or-ip/dis/sl-webhook"
 will be an appropriate Webhook URI. If https is desired, then the form must
-be “https://fqdn-or-ip/dis/sl-webhook” where the host/service handling the
+be "https://fqdn-or-ip/dis/sl-webhook" where the host/service handling the
 webhook call has a TLS cert registered for the fqdn and signed by a CA
 trusted by the Arbor Netscout server (the service’s cert is signed directly
 or indirectly by a CA trusted by the server). Note than in either case the
-default http/https port can be over-ridden by appending “:portnum” to the
+default http/https port can be over-ridden by appending ":portnum" to the
 webhook URI.
 
 In addition to configuring the protocol and URI path, the DIS client can be
-configured to authenticate webhook invocations via a “token” parameter. For
+configured to authenticate webhook invocations via a "token" parameter. For
 example a webhook URI of the form:
 
 `https://fqdn-or-ip/dis/sl-webhook?token=03240717821fe3531b13`
@@ -402,7 +402,7 @@ Commit the config once the changes are complete:
 
 4. **Configure webhook notification limits to prevent excessive queuing of webhook notifications.**
 
-Arbor Sightline will only consider a webhook “invoked” if it’s able to POST
+Arbor Sightline will only consider a webhook "invoked" if it’s able to POST
 the webhook notification body to the configured webhook endpoint URI(s) and
 the endpoint returns a HTTP 200 (success) status code. If the webhook isn’t
 successfully invoked, Sightline will attempt to invoke the endpoint again,
@@ -417,12 +417,12 @@ impact the memory usage and performance of the system.
 The following options can be set to control the notification behavior via
 the Arbor Sightline API:
 
--   The “notification webhooks retry_count_limit” and “notification webhooks
-    retry_count_max set” variables will limit the number of times a webhook will
+-   The "notification webhooks retry_count_limit" and "notification webhooks
+    retry_count_max set" variables will limit the number of times a webhook will
     be invoked for a particular attack report
 
--   The “notification webhooks retry_seconds_limit” and “notification webhooks
-    retry_seconds_max” will control the retry frequency for webhook
+-   The "notification webhooks retry_seconds_limit" and "notification webhooks
+    retry_seconds_max" will control the retry frequency for webhook
     notifications for a particular attack report
 
 For example, to set the webhook notification to perform no more than 10
@@ -478,6 +478,6 @@ quart.serving: INFO 10.80.50.24:52142 GET / 2 405 137 2388
 ```
 
 If not, check the monitor configuration values and if using https with a custom
-CA certs, use the curl “—cacert” to ensure the CA cert is valid and matches the
+CA certs, use the curl "—cacert" to ensure the CA cert is valid and matches the
 one running on the monitor server. If it does validate, ensure the CA cert is
 added to the Arbor Monitor trust store.
