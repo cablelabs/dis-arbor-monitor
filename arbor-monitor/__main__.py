@@ -168,7 +168,7 @@ def send_report_to_dis_server(attack_id, attack_payload, src_traffic_report):
     dis_client.add_attribute_to_event(event_uuid=dis_event,
                                       name="impact_pps", enum="PPS", value=impact_pps)
     dis_client.add_attribute_to_event(event_uuid=dis_event,
-                                      name="local_attack_id", enum="BIGINT", value=attack_id)
+                                      name="local_attack_id", enum="LOCAL_ATTACK_ID", value=attack_id)
 
     # Add the source address info from the report to the event
     source_ip_list = add_source_ips_v2(dis_client, dis_event, attack_id, src_traffic_report)
