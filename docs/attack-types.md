@@ -45,5 +45,5 @@ Note that attribute metrics are optional as some DDoS detection systems don't pr
 
 | ID/Shortname  | Longname              | Allowed Units | Allowed Values      |Protocols|Dest Ports|Popularity| Description |
 | ------------- |-----------------------| --------------|---------------------|---------|----------|----------|-------------|
-| SSDP-Amp      | SSDP Amplification    | BPS, PPS      | Positive 64-bit ints| UDP     | 1900     |          | packet size range for request is 90-130 bytes. Packet size range for reply is 248-420 bytes. Amplification factor is 30x. No fragments generated 
-| CharGen-Amp   | CharGen Amplification | BPS, PPS      | Positive 64-bit ints| UDP     | 19       | 17       | packet size range for request is 29-76 bytes. Amplification factor is 358.8x
+| ssdp-amp      | SSDP Amplification    | BPS, PPS      | Positive 64-bit ints| UDP     | 1900     |          | packet size range for request is 90-130 bytes. Packet size range for reply is 248-420 bytes. Amplification factor is 30x. No fragments generated 
+| chargen-amp   | CharGen Amplification | BPS, PPS      | Positive 64-bit ints| UDP     | 19       | 17       | packet size range for request is 29-76 bytes. Amplification factor is 358.8x
