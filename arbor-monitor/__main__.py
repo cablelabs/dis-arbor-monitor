@@ -214,7 +214,7 @@ def add_source_ips_v1(dis_event, attack_id):
     The list of source IPs added
 
     """
-    response = requests.get(f"{args.arbor_api_prefix}9934{attack_id}/source_ip_addresses",
+    response = requests.get(f"{args.arbor_api_prefix}/api/sp/v6/alerts/{attack_id}/source_ip_addresses",
                             verify=not args.arbor_api_insecure,
                             headers={"X-Arbux-APIToken":args.arbor_api_token})
     json_response = response.json()
@@ -256,24 +256,24 @@ def add_source_ips_v2(dis_client, dis_event, attack_id, src_traffic_report):
                 if ip_net.prefixlen != 32:
                     logger.debug(f"Attack {attack_id}: Found IPv4 network {elem_name} (in {elem_id}) - skipping")
                     continue
-            elif isinstance(ip_net_addr, IPv6Network):
+            elif isinstance(ip_net, IPv6Network):
                 if ip_net.prefixlen != 128:
                     logger.debug(f"Attack {attack_id}: Found IPv6 network {elem_name} (in {elem_id}) - skipping")
                     continue
             else:
-                logger.info(f"Found unexpected IP network object {ip_net_addr} - skipping")
+                logger.info(f"Found unexpected IP network object {ip_net} - skipping")
                 continue
             # Assert: ip_net is a IPv4 or IPv6 address (not a network)
-            ip_net_addr = ip_net.network_address
+            ip_net_addr_str = str(ip_net.network_address)
             dis_client.add_attack_source_to_event(dis_event,
-                                                  ip=ip_net_addr,
+                                                  ip=ip_net_addr_str,
                                                   attribute_list=[
                                                       {
                                                           "enum": "BPS",
                                                           "name": "Bytes per second",
                                                           "value": str(elem_max_bps)
                                                       }])
-            ip_list.append(str(ip_net_addr))
+            ip_list.append(ip_net_addr_str)
         except Exception as ex:
             logger.info(f"Error processing '{elem_id}': {ex}")
 
