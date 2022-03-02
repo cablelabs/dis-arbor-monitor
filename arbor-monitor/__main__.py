@@ -158,29 +158,37 @@ def send_report_to_dis_server(attack_id, attack_payload, src_traffic_report):
     stop_timestamp = int(dateutil.parser.isoparse(stop_time).timestamp())
     logger.debug(f"Attack ID {attack_id}: Start/stop timestamp: {start_timestamp}/{stop_timestamp}")
 
-    dis_event = dis_client.add_attack_event(start_timestamp=start_timestamp,
-                                            end_timestamp=stop_timestamp,
-                                            attack_type=attack_subobjects.get("misuse_types"))
+    try:
+        dis_event = dis_client.add_attack_event(start_timestamp=start_timestamp,
+                                                end_timestamp=stop_timestamp,
+                                                attack_type=attack_subobjects.get("misuse_types"))
 
-    # Add attributes to the attack event
-    dis_client.add_attribute_to_event(event_uuid=dis_event,
-                                      name="impact_bps", enum="BPS", value=impact_bps)
-    dis_client.add_attribute_to_event(event_uuid=dis_event,
-                                      name="impact_pps", enum="PPS", value=impact_pps)
-    dis_client.add_attribute_to_event(event_uuid=dis_event,
-                                      name="local_attack_id", enum="BIGINT", value=attack_id)
+        # Add attributes to the attack event
+        dis_client.add_attribute_to_event(event_uuid=dis_event,
+                                          name="impact_bps", enum="BPS", value=impact_bps)
+        dis_client.add_attribute_to_event(event_uuid=dis_event,
+                                          name="impact_pps", enum="PPS", value=impact_pps)
+        dis_client.add_attribute_to_event(event_uuid=dis_event,
+                                          name="local_attack_id", enum="BIGINT", value=attack_id)
 
-    # Add the source address info from the report to the event
-    source_ip_list = add_source_ips_v2(dis_client, dis_event, attack_id, src_traffic_report)
-    logger.info(f"Attack ID {attack_id}: Found {len(source_ip_list)} source IPs")
-    logger.info(f"Attack ID {attack_id}: First 50 source IPs: {source_ip_list[0:50]}")
+        # Add the source address info from the report to the event
+        source_ip_list = add_source_ips_v2(dis_client, dis_event, attack_id, src_traffic_report)
+        logger.info(f"Attack ID {attack_id}: Found {len(source_ip_list)} source IPs")
+        logger.info(f"Attack ID {attack_id}: First 50 source IPs: {source_ip_list[0:50]}")
+    except Exception as ex:
+        warn_msg = f"Caught an exception adding attack report for attack ID {attack_id} ({ex})"
+        logger.warning(warn_msg)
 
-    staged_event_ids = dis_client.get_staged_event_ids()
-    logger.info(f"Attack ID {attack_id}: Staged event IDs: {staged_event_ids}")
-    # TODO: Add accessor for the DIS client base URL so we can log it
-    logger.info(f"Attack ID {attack_id}: Sending report to DIS server")
-    msg = dis_client.send()
-    logger.info(f"Attack ID {attack_id}: Report sent/queued to DIS server ({msg})")
+    try:
+        staged_event_ids = dis_client.get_staged_event_ids()
+        logger.info(f"Attack ID {attack_id}: Staged event IDs: {staged_event_ids}")
+        # TODO: Add accessor for the DIS client base URL so we can log it
+        logger.info(f"Attack ID {attack_id}: Sending report to DIS server")
+        msg = dis_client.send()
+        logger.info(f"Attack ID {attack_id}: Report sent/queued to DIS server ({msg})")
+    except Exception as ex:
+        warn_msg = f"Caught an exception uploading attack(s) ({ex})"
+        logger.warning(warn_msg)
 
     return source_ip_list
 
@@ -214,7 +222,7 @@ def add_source_ips_v1(dis_event, attack_id):
     The list of source IPs added
 
     """
-    response = requests.get(f"{args.arbor_api_prefix}9934{attack_id}/source_ip_addresses",
+    response = requests.get(f"{args.arbor_api_prefix}/api/sp/v6/alerts/{attack_id}/source_ip_addresses",
                             verify=not args.arbor_api_insecure,
                             headers={"X-Arbux-APIToken":args.arbor_api_token})
     json_response = response.json()
