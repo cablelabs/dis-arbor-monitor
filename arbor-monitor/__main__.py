@@ -176,8 +176,7 @@ def send_report_to_dis_server(attack_id, attack_payload, src_traffic_report):
         logger.info(f"Attack ID {attack_id}: Found {len(source_ip_list)} source IPs")
         logger.info(f"Attack ID {attack_id}: First 50 source IPs: {source_ip_list[0:50]}")
     except Exception as ex:
-        warn_msg = f"Caught an exception adding attack report for attack ID {attack_id} ({ex})"
-        logger.warning(warn_msg)
+        logger.warning(f"Caught an exception adding attack report for attack ID {attack_id} ({ex})")
 
     try:
         staged_event_ids = dis_client.get_staged_event_ids()
@@ -187,8 +186,7 @@ def send_report_to_dis_server(attack_id, attack_payload, src_traffic_report):
         msg = dis_client.send()
         logger.info(f"Attack ID {attack_id}: Report sent/queued to DIS server ({msg})")
     except Exception as ex:
-        warn_msg = f"Caught an exception uploading attack(s) ({ex})"
-        logger.warning(warn_msg)
+        logger.warning(f"Caught an exception uploading attack(s) ({ex})")
 
     return source_ip_list
 
