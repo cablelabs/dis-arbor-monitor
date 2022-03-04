@@ -305,12 +305,21 @@ def save_attack_report_file(report_storage_path, report_storage_format,
             elem_name = bps_elem['name']
             elem_max_bps = bps_elem['max_value']
             logger.debug(f"    name: {elem_name}, max bps: {elem_max_bps}")
-            net_addr = IPv4Network(elem_name, strict=True)
-            if net_addr.prefixlen != 32:
-                logger.info(f"Attack {attack_id}: Network bitmask for {elem_id} is not 32 bits ({elem_name}) - skipping")
+            ip_net = ip_network(elem_name)
+            if isinstance(ip_net, IPv4Network):
+                if ip_net.prefixlen != 32:
+                    logger.debug(f"Attack {attack_id}: Found IPv4 network {elem_name} (in {elem_id}) - skipping")
+                    continue
+            elif isinstance(ip_net, IPv6Network):
+                if ip_net.prefixlen != 128:
+                    logger.debug(f"Attack {attack_id}: Found IPv6 network {elem_name} (in {elem_id}) - skipping")
+                    continue
             else:
-                ip_addr_str = str(net_addr.network_address)
-                src_ip_info.append({"address": ip_addr_str, "max_bps": elem_max_bps})
+                logger.info(f"Found unexpected IP network object {ip_net} - skipping")
+                continue
+            # Assert: ip_net is a IPv4 or IPv6 address (not a network)
+            ip_net_addr_str = str(ip_net.network_address)
+            src_ip_info.append({"address": ip_net_addr_str, "max_bps": elem_max_bps})
         except Exception as ex:
             logger.info(f"Error saving '{elem_id}' to file: {ex}")
 
