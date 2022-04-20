@@ -112,7 +112,7 @@ def check_sightline_api_supported():
     """
 
     response = requests.get(f"{args.arbor_api_prefix}/api/sp",
-                            verify=not args.arbor_api_insecure,
+                            verify=args.arbor_api_insecure,
                             headers={"X-Arbux-APIToken":args.arbor_api_token})
     if response.status_code != requests.codes.ok:
         logger.error(f"Error retrieving {response.url}: (HTTP Status: {response.status_code} ({response.reason}))")
