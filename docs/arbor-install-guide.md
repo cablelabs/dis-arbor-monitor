@@ -97,8 +97,8 @@ For installing the DIS Arbor Monitor/Client, perform the following:
 1.  **Retrieve the latest Docker management script for the DDOS Info Sharing client:**
     
     ```
-    wget https://raw.githubusercontent.com/cablelabs/dis-arbor-monitor/master/ arbormon-container.sh
-    wget https://raw.githubusercontent.com/cablelabs/dis-arbor-monitor/master/ arbormon-container.conf
+    wget https://raw.githubusercontent.com/cablelabs/dis-arbor-monitor/master/arbormon-container.sh
+    wget https://raw.githubusercontent.com/cablelabs/dis-arbor-monitor/master/arbormon-container.conf
     ```
 
 2.  **Install the script:**
@@ -445,6 +445,8 @@ following:
     services sp notification webhooks retry_seconds_limit enable
     services sp notification webhooks retry_seconds_max set 60
     ```
+   
+    Note: These settings will persist across reboots of Sightline.
 
 ## 6. Validation
 
