@@ -329,7 +329,7 @@ function docker-run()
                                --cert-key-file /app/lib/tls-key.pem)
     fi
 
-    if [ "$arbor_rest_api_insecure" == "True" ]; then
+    if [ "$arbor_rest_api_insecure" == "True" -o "$arbor_rest_api_insecure" == "true" -o "$arbor_rest_api_insecure" == "TRUE" ]; then
         arbor_rest_api_insecure_opt="--arbor-api-insecure"
     fi
 

@@ -105,8 +105,8 @@ For installing the DIS Arbor Monitor/Client, perform the following:
 
     ```
     sudo mkdir /etc/dis-arbor-monitor/
-    sudo install -v -o root -m 755 -D -t /etc/dis-arbor-monitor/arbormon-container.sh
-    sudo install -v -o root -m 600 -D -C -t /etc/dis-arbor-monitor/arbormon-container.conf
+    sudo install -v -o root -m 755 -D -t /etc/dis-arbor-monitor/ arbormon-container.sh
+    sudo install -v -o root -m 600 -D -C -t /etc/dis-arbor-monitor/ arbormon-container.conf
     ```
 
 3.  **Configure the settings for your environment:**
@@ -355,7 +355,7 @@ For installing the DIS Arbor Monitor/Client, perform the following:
 To configure Arbor NetScout to notify the DIS monitor/client, perform the
 following:
 
-1.  **Setup a Managed Object with suitable DDoS notification limits:**
+1. **Setup a Managed Object with suitable DDoS notification limits:**
 
     ![](resources/managed-objects.png)
 
@@ -367,7 +367,7 @@ following:
 
     ![](resources/save-host-detection.png)
 
-2.  **Create a notification group:**
+2. **Create a notification group:**
 
     ![](resources/arbor-groups.png)
 
@@ -438,6 +438,15 @@ following:
     For example, to set the webhook notification to perform no more than 10
     notifications per attack – with 1 minute between notifications, the
     following commands can be invoked on the Sightline CLI:
+
+    ```lines
+    services sp notification webhooks retry_count_limit enable 
+    services sp notification webhooks retry_count_max set 10
+    services sp notification webhooks retry_seconds_limit enable
+    services sp notification webhooks retry_seconds_max set 60
+    ```
+   
+    Note: These settings will persist across reboots of Sightline.
 
 ## 6. Validation
 
