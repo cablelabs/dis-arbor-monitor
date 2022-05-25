@@ -145,6 +145,7 @@ function process_arguments()
     docker_as_user="$DEF_DOCKER_AS_USER"
     docker_as_group="$DEF_DOCKER_AS_GROUP"
     debug="$DEF_DEBUG"
+    dis_hostname = "$DEF_DIS_HOSTNAME"
 
     while [[ $1 == --* ]]; do
         opt_name=$1
