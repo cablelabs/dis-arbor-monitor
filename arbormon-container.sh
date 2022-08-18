@@ -50,23 +50,22 @@ function print_usage()
     echo ""
     echo "   operation can be one of:"
     echo ""
-    echo "     docker-pull: Download the $shortname docker image"
+    echo "     docker-pull: Load the $shortname docker image from a repository or image file"
     echo "     docker-run: Create and start the $shortname docker container"
     echo "     docker-run-interactive: Start a shell to run $shortname (for debugging)"
     echo "     docker-status: Show the status of the $shortname docker container"
     echo "     docker-stop: Stop the $shortname docker container"
     echo "     docker-kill: Kill the $shortname docker container"
     echo "     docker-rm: Delete the $shortname docker container (can recreate with docker-run)"
-    echo "     docker-restart: Restart the $shortname docker container (with the original params)"
+    echo "     docker-relaunch: Remove the container and restart (do this after changing params/conf file)"
     echo "     docker-update: Kill & remove the container, update image from repo, and start container"
     echo "     docker-logs: Show the logs for $shortname docker container"
-    echo "     docker-relaunch: Remove the container and restart (do this after changing params/conf file)"
     echo "     docker-trace: Watch the logs for the $shortname docker container"
     echo "     docker-address: Print the IP addresses for the $shortname docker container"
     echo "     docker-env: List the environment variables for the $shortname docker container"
     echo "     docker-shell: Start an interactive shell into the running docker service container"
     echo ""
-    echo "   [--docker-image <docker image ID>]"
+    echo "   [--docker-image <docker image repository URL or a filename>]"
     echo "       (default \"$DEF_IMAGE_LOCATION\")"
     echo "   [--docker-image-tag <docker image tag>]"
     echo "       (default \"$DEF_IMAGE_TAG\")"
@@ -308,8 +307,18 @@ function process_arguments()
 
 function docker-pull()
 {
-    echo "Pulling docker image from $docker_image_id:$docker_image_tag"
-	$DOCKER_CMD pull $docker_image_id:$docker_image_tag
+    if [ -f  "$docker_image_id" ]; then
+        if $(gunzip -tq "$docker_image_id"); then
+            echo "Loading docker image from compressed file $docker_image_id"
+            gunzip < "$docker_image_id" | docker load
+        else
+            echo "Loading docker image from file $docker_image_id"
+            docker load -i "$docker_image_id"
+        fi
+    else
+        echo "Pulling docker image from registry $docker_image_id:$docker_image_tag"
+        $DOCKER_CMD pull $docker_image_id:$docker_image_tag
+    fi
 }
 
 function docker-run()
@@ -502,12 +511,6 @@ function docker-kill()
 {
     echo "Killing container \"$container_name\""
     $DOCKER_CMD container kill $container_name
-}
-
-function docker-restart()
-{
-    echo "Restart container \"$container_name\""
-    $DOCKER_CMD container restart $container_name
 }
 
 function docker-relaunch()

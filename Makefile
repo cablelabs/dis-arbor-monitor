@@ -10,5 +10,6 @@ docker-push:
 	docker login $(DOCKER_REGISTRY)
 	docker push $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_PATH)
 
+# Restore saved image using: gunzip < $(DOCKER_SAVE_FILE).gz | docker load
 docker-save:
 	docker save $(DOCKER_REGISTRY)/$(DOCKER_IMAGE_PATH) | gzip > $(DOCKER_SAVE_FILE).gz
