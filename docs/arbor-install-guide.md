@@ -404,6 +404,10 @@ following:
 
     ![](resources/save-notification-rule.png)
 
+    * Note: Alternatively, a Notification Rule can be setup with a CIDR instead of a Managed Object. 
+            For example, a CIDR of "0.0.0.0/0"/"0::0" will allow the DIS Notification Group to be triggered
+            for all DDoS attacks detected by Arbor NetScout. 
+    
     Commit the config once the changes are complete:
 
     ![](resources/commit-config.png)
@@ -448,16 +452,103 @@ following:
 
 ## 6. Validation
 
-Confirmation of the invocation of the configured webhook can be performed by
-examining the DIS Arbor Monitor/Client log. The log can be retrieved by running
-the following command:
+The information in this section can be used to validate and/or debug the 
+communication between the DIS Arbor Monitor and the Arbor Netscout and DIS
+backend systems.
+
+### Client Startup
+
+On startup, the DIS Arbor NetScout client monitor will attempt to connect to 
+the Arbor Netscout API and the DIS backend API using the configured API keys. 
+To confirm that the client was able to connect successfully, use the following 
+command to examine the client log:
 
 ```
 /etc/dis-arbor-monitor/arbormon-container.sh docker-logs
 ```
 
-When an attack is detected, the first indication you will see in the DIS Arbor
-monitor/client log will be an entry of the form:
+On successful startup, the logs should start with something similar to:
+
+```
+dis-arbor-monitor: INFO Debug: False
+dis-arbor-monitor: INFO Dry run: False
+dis-arbor-monitor: INFO Bind address: 0.0.0.0
+dis-arbor-monitor: INFO Bind port: 8443
+dis-arbor-monitor: INFO Cert chain file: /app/lib/tls-cert-chain.pem
+dis-arbor-monitor: INFO Cert key file: /app/lib/tls-key.pem
+dis-arbor-monitor: INFO Arbor API prefix: https://arbor-001.acme.com
+dis-arbor-monitor: INFO Arbor API token: Your-Arbor-API-Token
+dis-arbor-monitor: INFO Consumer URL: 
+dis-arbor-monitor: INFO Consumer API key: 
+dis-arbor-monitor: INFO DIS client name: ACME Arbor 001
+dis-arbor-monitor: INFO DIS client organization: Acme Corp
+dis-arbor-monitor: INFO DIS client description: Data from Arbor Netscout 001 
+dis-arbor-monitor: INFO DIS client contact: dis-admin@acme.com
+dis-arbor-monitor: INFO Client type name: Arbor Ingester 001
+dis-arbor-monitor: INFO Client type maker: Arbor
+dis-arbor-monitor: INFO Client type version: 0.0.0
+```
+
+If there are errors at startup connecting to the Arbor Sightline API, check the
+`DEF_ARBOR_REST_API_PREFIX`, `DEF_ARBOR_REST_API_TOKEN`, and `DEF_ARBOR_REST_API_INSECURE`
+settings in the "arbormon-container.conf" file. 
+
+If there are errors connecting to the DIS backend server, check the 
+`DEF_REPORT_CONSUMER_API_URI`, `DEF_REPORT_CONSUMER_API_KEY`, 
+and `DEF_REPORT_CONSUMER_HTTP_PROXY` settings.
+
+### Webhook Notifications
+
+To test that the client can receive webhook notifications on the host, 
+run the following curl command:
+
+```
+curl -s -X POST 'http://127.0.0.1:8080/dis/sl-webhook' \
+-H 'Content-Type: application/json' \
+-d '{"data": {"attributes": {"alert_class": "test","alert_type": "just_a_test"}},
+     "id":"000000"}'
+```
+
+If the webhook invocation is successful, you should see entries similar to the following:
+
+```
+DEBUG Sightline notification payload:{
+   "data": {
+      "attributes": {
+         "alert_class": "test",
+         "alert_type": "just_a_test"
+      }
+   },
+   "id": "000000"
+}
+INFO Ignoring alert regarding non-DOS attack (attack ID None is a test/just_a_test alert)
+127.0.0.1:51799 POST /dis/sl-webhook 1.1 200 44 1148
+```
+
+If this test is successful, run the same command using the exact URL configured
+above in the Arbor NetScout Notification Group. For example:
+
+```
+curl -s -X POST 'https://arbormon-001.acme.com:8443/dis/sl-webhook?token=mydisclienttoken' \
+-H 'Content-Type: application/json' \
+-d '{"data": {"attributes": {"alert_class": "test","alert_type": "just_a_test"}},
+     "id":"000000"}'
+```
+
+If this test is also successful, run this same command from another host and, 
+ideally, from a shell on the Arbor Netscout system itself. 
+
+* Note: If custom/enterprise X.509 certificates are configured for the DIS client 
+  (using the `DEF_TLS_CERT_CHAIN_FILE` and `DEF_TLS_PRIV_KEY_FILE` options)
+  then use the curl `--cacert` followed by the enterprise CA cert chain file or the 
+  `--insecure` flag to disable cert chain checks when self-signed certificates are 
+  being used.
+
+### Normal Operation
+
+When an attack is detected by Netscout, and the webhook endpoint is invoked,
+the first indication you will see in the DIS Arbor monitor/client log will be 
+an entry of the form:
 
 `INFO Received notification of ONGOING attack (ID: 6831)`
 
@@ -476,29 +567,5 @@ INFO Attack ID 6831: Report sent
 ```
 
 If Arbor Netscout indicates that a DDoS attack was detected, and there’s no
-corresponding log entry, then check the configuration. Or to verify the webhook
-address is correct, you can use curl to perform a GET on the webhook URI and
-verify the monitor/client can be contacted. For example:
+corresponding log entry, then double-check the configuration using the steps above. 
 
-```
-curl http://arbormon-001.acme.com
-```
-
-or if custom certs are being used with https on a custom port:
-
-```
-curl --insecure https://arbormon-001.acme.com:8443
-```
-
-If the URI is correct, the DIS Arbor Monitor log should print an entry when it
-rejects the GET request:
-
-```
-10.80.50.24:52142 GET / 2 405 137 2388
-quart.serving: INFO 10.80.50.24:52142 GET / 2 405 137 2388
-```
-
-If not, check the monitor configuration values and if using https with a custom
-CA certs, use the curl "—cacert" to ensure the CA cert is valid and matches the
-one running on the monitor server. If it does validate, ensure the CA cert is
-added to the Arbor Monitor trust store.
