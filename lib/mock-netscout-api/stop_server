@@ -1,0 +1,2 @@
+#!/bin/bash
+pid=$(cat lighttpd.pid) && echo "Stopping lighttp server (PID $pid)" && kill $pid && rm -f ./lighttpd.conf

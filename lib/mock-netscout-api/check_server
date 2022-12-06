@@ -1,0 +1,2 @@
+#!/bin/bash
+pid=$(cat lighttpd.pid) && ps $pid

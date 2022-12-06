@@ -1,0 +1,15 @@
+{
+  "data": {
+    "attributes": {
+      "alert_class": "test",
+      "alert_type": "just_a_test"
+    },
+    "id": "000000"
+  },
+  "meta": {
+    "api": "SP", 
+    "api_version": "6", 
+    "sp_build_id": "JGKK", 
+    "sp_version": "9.1"
+  }
+}

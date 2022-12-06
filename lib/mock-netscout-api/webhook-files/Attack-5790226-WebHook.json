@@ -1,0 +1,139 @@
+{
+  "data": {
+    "attributes": {
+      "alert_class": "dos", 
+      "alert_type": "dos_host_detection", 
+      "classification": "Possible Attack", 
+      "importance": 2, 
+      "ongoing": false, 
+      "start_time": "2021-01-13T06:34:40+00:00", 
+      "stop_time": "2021-01-13T08:18:37+00:00", 
+      "subobject": {
+        "direction": "Incoming", 
+        "fast_detected": true, 
+        "host_address": "84.25.222.162", 
+        "impact_boundary": "managed object", 
+        "impact_bps": 623372416, 
+        "impact_pps": 1474953, 
+        "ip_version": 4, 
+        "misuse_types": [
+          "UDP"
+        ], 
+        "severity_percent": 123.0, 
+        "severity_threshold": 1200000, 
+        "severity_unit": "pps", 
+        "summary_url": "/page?id=customer_summary&gid=718"
+      }
+    }, 
+    "id": "5790226", 
+    "links": {
+      "self": "https://arbor.aorta.net/api/sp/v6/alerts/5790226"
+    }, 
+    "relationships": {
+      "annotations": {
+        "data": [
+          {
+            "id": "5287639", 
+            "type": "alert_annotation"
+          }, 
+          {
+            "id": "5287478", 
+            "type": "alert_annotation"
+          }, 
+          {
+            "id": "5287477", 
+            "type": "alert_annotation"
+          }, 
+          {
+            "id": "5287476", 
+            "type": "alert_annotation"
+          }
+        ], 
+        "links": {
+          "related": "https://arbor.aorta.net/api/sp/v6/alerts/5790226/annotations/"
+        }
+      }, 
+      "device": {
+        "data": {
+          "id": "1030", 
+          "type": "device"
+        }, 
+        "links": {
+          "related": "https://arbor.aorta.net/api/sp/v6/devices/1030"
+        }
+      }, 
+      "managed_object": {
+        "data": {
+          "id": "718", 
+          "type": "managed_object"
+        }, 
+        "links": {
+          "related": "https://arbor.aorta.net/api/sp/v6/managed_objects/718"
+        }
+      }, 
+      "mitigation": {
+        "data": [
+          {
+            "id": "tms-649784", 
+            "type": "mitigation"
+          }
+        ], 
+        "links": {
+          "related": "https://arbor.aorta.net/api/sp/v6/alerts/5790226/mitigations/"
+        }
+      }, 
+      "packet_size_distribution": {
+        "data": {
+          "id": "packet-size-distribution-5790226", 
+          "type": "alert_packet_size_distribution"
+        }, 
+        "links": {
+          "related": "https://arbor.aorta.net/api/sp/v6/alerts/5790226/packet_size_distribution"
+        }
+      }, 
+      "patterns": {
+        "links": {
+          "related": "https://arbor.aorta.net/api/sp/v6/alerts/5790226/patterns/"
+        }
+      }, 
+      "router_traffic": {
+        "links": {
+          "related": "https://arbor.aorta.net/api/sp/v6/alerts/5790226/router_traffic/"
+        }
+      }, 
+      "source_ip_addresses": {
+        "data": {
+          "id": "source-ip-addresses-5790226", 
+          "type": "alert_source_ip_addresses"
+        }, 
+        "links": {
+          "related": "https://arbor.aorta.net/api/sp/v6/alerts/5790226/source_ip_addresses"
+        }
+      }, 
+      "thresholds": {
+        "links": {
+          "related": "https://arbor.aorta.net/api/sp/v6/alerts/5790226/misuse_types_thresholds/"
+        }
+      }, 
+      "traffic": {
+        "data": {
+          "id": "alert-traffic-5790226", 
+          "type": "alert_traffic"
+        }, 
+        "links": {
+          "related": "https://arbor.aorta.net/api/sp/v6/alerts/5790226/traffic"
+        }
+      }
+    }, 
+    "type": "alert"
+  }, 
+  "links": {
+    "self": "https://arbor.aorta.net/api/sp/v6/alerts/5790226"
+  }, 
+  "meta": {
+    "api": "SP", 
+    "api_version": "6", 
+    "sp_build_id": "JGKK", 
+    "sp_version": "9.1"
+  }
+}

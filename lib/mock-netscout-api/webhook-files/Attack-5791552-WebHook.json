@@ -1,0 +1,120 @@
+{
+  "data": {
+    "attributes": {
+      "alert_class": "dos", 
+      "alert_type": "dos_host_detection", 
+      "classification": "Possible Attack", 
+      "importance": 2, 
+      "ongoing": false, 
+      "start_time": "2021-01-14T08:50:41+00:00", 
+      "stop_time": "2021-01-14T09:45:37+00:00", 
+      "subobject": {
+        "direction": "Incoming", 
+        "fast_detected": true, 
+        "host_address": "81.83.11.60", 
+        "impact_boundary": "managed object", 
+        "impact_bps": 2861304576, 
+        "impact_pps": 245085, 
+        "ip_version": 4, 
+        "misuse_types": [
+          "IP Fragmentation", 
+          "DNS Amplification"
+        ], 
+        "severity_percent": 572.0, 
+        "severity_threshold": 500000000, 
+        "severity_unit": "bps"
+      }
+    }, 
+    "id": "5791552", 
+    "links": {
+      "self": "https://arbor.aorta.net/api/sp/v6/alerts/5791552"
+    }, 
+    "relationships": {
+      "annotations": {
+        "data": [
+          {
+            "id": "5292159", 
+            "type": "alert_annotation"
+          }, 
+          {
+            "id": "5292157", 
+            "type": "alert_annotation"
+          }
+        ], 
+        "links": {
+          "related": "https://arbor.aorta.net/api/sp/v6/alerts/5791552/annotations/"
+        }
+      }, 
+      "device": {
+        "data": {
+          "id": "1030", 
+          "type": "device"
+        }, 
+        "links": {
+          "related": "https://arbor.aorta.net/api/sp/v6/devices/1030"
+        }
+      }, 
+      "managed_object": {
+        "data": {
+          "id": "1071", 
+          "type": "managed_object"
+        }, 
+        "links": {
+          "related": "https://arbor.aorta.net/api/sp/v6/managed_objects/1071"
+        }
+      }, 
+      "packet_size_distribution": {
+        "data": {
+          "id": "packet-size-distribution-5791552", 
+          "type": "alert_packet_size_distribution"
+        }, 
+        "links": {
+          "related": "https://arbor.aorta.net/api/sp/v6/alerts/5791552/packet_size_distribution"
+        }
+      }, 
+      "patterns": {
+        "links": {
+          "related": "https://arbor.aorta.net/api/sp/v6/alerts/5791552/patterns/"
+        }
+      }, 
+      "router_traffic": {
+        "links": {
+          "related": "https://arbor.aorta.net/api/sp/v6/alerts/5791552/router_traffic/"
+        }
+      }, 
+      "source_ip_addresses": {
+        "data": {
+          "id": "source-ip-addresses-5791552", 
+          "type": "alert_source_ip_addresses"
+        }, 
+        "links": {
+          "related": "https://arbor.aorta.net/api/sp/v6/alerts/5791552/source_ip_addresses"
+        }
+      }, 
+      "thresholds": {
+        "links": {
+          "related": "https://arbor.aorta.net/api/sp/v6/alerts/5791552/misuse_types_thresholds/"
+        }
+      }, 
+      "traffic": {
+        "data": {
+          "id": "alert-traffic-5791552", 
+          "type": "alert_traffic"
+        }, 
+        "links": {
+          "related": "https://arbor.aorta.net/api/sp/v6/alerts/5791552/traffic"
+        }
+      }
+    }, 
+    "type": "alert"
+  }, 
+  "links": {
+    "self": "https://arbor.aorta.net/api/sp/v6/alerts/5791552"
+  }, 
+  "meta": {
+    "api": "SP", 
+    "api_version": "6", 
+    "sp_build_id": "JGKK", 
+    "sp_version": "9.1"
+  }
+}

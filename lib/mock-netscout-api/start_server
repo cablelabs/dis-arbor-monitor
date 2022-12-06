@@ -1,0 +1,6 @@
+#!/bin/bash
+if [[ ! -e ./lighttpd.conf ]]; then
+  sed "s|PWD|$PWD|g" < lighttpd.conf.template > ./lighttpd.conf
+fi
+
+lighttpd -f ./lighttpd.conf && echo "Started lighttpd server (PID $(cat lighttpd.pid))"

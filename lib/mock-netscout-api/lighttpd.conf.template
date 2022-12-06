@@ -1,0 +1,44 @@
+server.modules = (
+	"mod_access",
+	"mod_alias",
+	"mod_deflate",
+ 	"mod_redirect",
+  "mod_rewrite",
+)
+
+server.document-root        = "PWD/server-root"
+server.upload-dirs          = ( "PWD/uploads" )
+server.errorlog             = "PWD/error.log"
+server.pid-file             = "PWD/lighttpd.pid"
+# server.username             = "www-data"
+# server.groupname            = "www-data"
+server.port                 = "8088"
+
+#index-file.names            = ( "index.php", "index.html",
+#                                "index.htm", "default.htm",
+#                               " index.lighttpd.html" )
+mimetype.assign = ( ".html" => "text/html" , ".json" => "application/json" )
+
+url.rewrite-if-not-file = ( "^([^?]*)(\?.*)?$" => "$1.json$2" )
+url.redirect = ( "^([^?]*)/(\?.*)?$" => "$1$2" )
+
+url.access-deny             = ( "~", ".inc" )
+
+static-file.exclude-extensions = ( ".php", ".pl", ".fcgi" )
+
+## Use ipv6 if available
+#include_shell "/usr/share/lighttpd/use-ipv6.pl"
+
+dir-listing.encoding        = "utf-8"
+server.dir-listing          = "enable"
+
+deflate.cache-dir           = "PWD/cache"
+deflate.mimetypes           = ( "application/x-javascript", "text/css", "text/html", "text/plain" )
+
+# include_shell "/usr/share/lighttpd/create-mime.assign.pl"
+# include_shell "/usr/share/lighttpd/include-conf-enabled.pl"
+
+debug.log-request-header = "enable"
+debug.log-file-not-found = "enable"
+debug.log-request-handling = "enable"
+debug.log-response-header = "enable"

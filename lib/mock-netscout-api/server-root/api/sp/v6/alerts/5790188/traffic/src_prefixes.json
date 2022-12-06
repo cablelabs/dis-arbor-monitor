@@ -1,0 +1,328 @@
+{
+   "data" : [
+      {
+         "id" : "5790188-src_prefixes-0.0.0.0/0",
+         "type" : "alert_traffic_src_prefixes",
+         "attributes" : {
+            "view" : {
+               "network" : {
+                  "unit" : {
+                     "bps" : {
+                        "pct95_value" : 793977011,
+                        "current_value" : 0,
+                        "max_value" : 4677918626,
+                        "step" : 60,
+                        "name" : "0.0.0.0/0",
+                        "timeseries_start" : "2021-01-13T04:33:15+00:00",
+                        "avg_value" : 555192510,
+                        "timeseries" : [
+                           0,
+                           552891808,
+                           4677918626,
+                           1111658001,
+                           565745856,
+                           32933529,
+                           348641109,
+                           625944577,
+                           680755310,
+                           777870691,
+                           704592147,
+                           300665488,
+                           19056835,
+                           0,
+                           326836610,
+                           625419733,
+                           764743057,
+                           653568055,
+                           593168186,
+                           793977011,
+                           646161017,
+                           689408199,
+                           562922819,
+                           35904911,
+                           9799215,
+                           0,
+                           0,
+                           0,
+                           0
+                        ]
+                     }
+                  }
+               }
+            }
+         },
+         "relationships" : {
+            "parent" : {
+               "data" : {
+                  "type" : "alert",
+                  "id" : "5790188"
+               },
+               "links" : {
+                  "related" : "https://arbor.aorta.net/api/sp/v6/alerts/5790188"
+               }
+            }
+         }
+      },
+      {
+         "id" : "5790188-src_prefixes-95.129.96.154/32",
+         "type" : "alert_traffic_src_prefixes",
+         "attributes" : {
+            "view" : {
+               "network" : {
+                  "unit" : {
+                     "bps" : {
+                        "step" : 60,
+                        "current_value" : 0,
+                        "max_value" : 40654082,
+                        "pct95_value" : 35152057,
+                        "timeseries" : [
+                           0,
+                           6000013,
+                           37222059,
+                           5000010,
+                           23362041,
+                           0,
+                           4000007,
+                           10000016,
+                           35152057,
+                           13930021,
+                           25004040,
+                           4358007,
+                           0,
+                           0,
+                           6000008,
+                           22218031,
+                           7000012,
+                           6000012,
+                           10000021,
+                           40654082,
+                           13000027,
+                           28292047,
+                           8930018,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0
+                        ],
+                        "avg_value" : 10555949,
+                        "timeseries_start" : "2021-01-13T04:33:15+00:00",
+                        "name" : "95.129.96.154/32"
+                     }
+                  }
+               }
+            }
+         },
+         "relationships" : {
+            "parent" : {
+               "data" : {
+                  "type" : "alert",
+                  "id" : "5790188"
+               },
+               "links" : {
+                  "related" : "https://arbor.aorta.net/api/sp/v6/alerts/5790188"
+               }
+            }
+         }
+      },
+      {
+         "id" : "5790188-src_prefixes-78.128.0.0/12",
+         "relationships" : {
+            "parent" : {
+               "links" : {
+                  "related" : "https://arbor.aorta.net/api/sp/v6/alerts/5790188"
+               },
+               "data" : {
+                  "type" : "alert",
+                  "id" : "5790188"
+               }
+            }
+         },
+         "type" : "alert_traffic_src_prefixes",
+         "attributes" : {
+            "view" : {
+               "network" : {
+                  "unit" : {
+                     "bps" : {
+                        "current_value" : 0,
+                        "max_value" : 52478777,
+                        "pct95_value" : 21734702,
+                        "step" : 60,
+                        "timeseries_start" : "2021-01-13T04:33:15+00:00",
+                        "name" : "78.128.0.0/12",
+                        "timeseries" : [
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           37900106,
+                           0,
+                           52478777,
+                           0,
+                           0,
+                           21734702,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0
+                        ],
+                        "avg_value" : 3865985
+                     }
+                  }
+               }
+            }
+         }
+      },
+      {
+         "id" : "5790188-src_prefixes-122.170.13.190/32",
+         "relationships" : {
+            "parent" : {
+               "links" : {
+                  "related" : "https://arbor.aorta.net/api/sp/v6/alerts/5790188"
+               },
+               "data" : {
+                  "id" : "5790188",
+                  "type" : "alert"
+               }
+            }
+         },
+         "attributes" : {
+            "view" : {
+               "network" : {
+                  "unit" : {
+                     "bps" : {
+                        "max_value" : 25242704,
+                        "current_value" : 0,
+                        "pct95_value" : 17337359,
+                        "step" : 60,
+                        "timeseries_start" : "2021-01-13T04:33:15+00:00",
+                        "name" : "122.170.13.190/32",
+                        "timeseries" : [
+                           0,
+                           10000020,
+                           25242704,
+                           13621352,
+                           9621353,
+                           0,
+                           6000008,
+                           17432043,
+                           17337359,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0,
+                           0
+                        ],
+                        "avg_value" : 3422580
+                     }
+                  }
+               }
+            }
+         },
+         "type" : "alert_traffic_src_prefixes"
+      },
+      {
+         "id" : "5790188-src_prefixes-46.166.185.46/32",
+         "relationships" : {
+            "parent" : {
+               "data" : {
+                  "type" : "alert",
+                  "id" : "5790188"
+               },
+               "links" : {
+                  "related" : "https://arbor.aorta.net/api/sp/v6/alerts/5790188"
+               }
+            }
+         },
+         "attributes" : {
+            "view" : {
+               "network" : {
+                  "unit" : {
+                     "bps" : {
+                        "pct95_value" : 12221622,
+                        "max_value" : 13772020,
+                        "current_value" : 0,
+                        "step" : 60,
+                        "name" : "46.166.185.46/32",
+                        "timeseries_start" : "2021-01-13T04:33:15+00:00",
+                        "avg_value" : 2584639,
+                        "timeseries" : [
+                           0,
+                           0,
+                           5310006,
+                           0,
+                           3223205,
+                           0,
+                           0,
+                           0,
+                           13421630,
+                           0,
+                           0,
+                           11334822,
+                           0,
+                           0,
+                           0,
+                           0,
+                           13772020,
+                           200000,
+                           200000,
+                           10796819,
+                           0,
+                           12221622,
+                           0,
+                           2400004,
+                           2074403,
+                           0,
+                           0,
+                           0,
+                           0
+                        ]
+                     }
+                  }
+               }
+            }
+         },
+         "type" : "alert_traffic_src_prefixes"
+      }
+   ],
+   "meta" : {
+      "api_version" : "6",
+      "api" : "SP",
+      "sp_build_id" : "JGKK",
+      "sp_version" : "9.1"
+   },
+   "links" : {
+      "self" : "https://arbor.aorta.net/api/sp/v6/alerts/5790188/traffic/src_prefixes/?query_unit=bps&query_view=network"
+   }
+}
