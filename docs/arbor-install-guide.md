@@ -375,12 +375,12 @@ following:
 
     ![](resources/save-notification-group.png)
 
-    Webhook "URI" provided here is just an example. This field must be
+    The webhook "URI" provided here is just an example. This field must be
     coordinated with the configuration of the DIS Monitor/Client as described in
     Section 4 (Install the DDoS Info Sharing (DIS) Monitor/Client (v2)).
 
-    If the DIS client is setup to listen for http notifications (with no TLS
-    cert configured), then an URI of the form "http://fqdn-or-ip/dis/sl-webhook"
+    If the DIS client is configured to listen for http notifications (with no TLS
+    cert configured), then a URI of the form "http://fqdn-or-ip/dis/sl-webhook"
     will be an appropriate Webhook URI. If https is desired, then the form must
     be "https://fqdn-or-ip/dis/sl-webhook" where the host/service handling the
     webhook call has a TLS cert registered for the fqdn and signed by a CA
@@ -408,7 +408,7 @@ following:
             For example, a CIDR of "0.0.0.0/0"/"0::0" will allow the DIS Notification Group to be triggered
             for all DDoS attacks detected by Arbor NetScout. 
     
-    Commit the config once the changes are complete:
+    Once the changes are made, the changes must be committed by selecting "Commit Config" from the web interface:
 
     ![](resources/commit-config.png)
 
@@ -467,40 +467,73 @@ command to examine the client log:
 /etc/dis-arbor-monitor/arbormon-container.sh docker-logs
 ```
 
-On successful startup, the logs should start with something similar to:
+On successful startup, with `DEF_DEBUG` set to `True`, the logs should start with something similar to:
 
 ```
-dis-arbor-monitor: INFO Debug: False
-dis-arbor-monitor: INFO Dry run: False
-dis-arbor-monitor: INFO Bind address: 0.0.0.0
-dis-arbor-monitor: INFO Bind port: 8443
-dis-arbor-monitor: INFO Cert chain file: /app/lib/tls-cert-chain.pem
-dis-arbor-monitor: INFO Cert key file: /app/lib/tls-key.pem
-dis-arbor-monitor: INFO Arbor API prefix: https://arbor-001.acme.com
-dis-arbor-monitor: INFO Arbor API token: Your-Arbor-API-Token
-dis-arbor-monitor: INFO Consumer URL: 
-dis-arbor-monitor: INFO Consumer API key: 
-dis-arbor-monitor: INFO DIS client name: ACME Arbor 001
-dis-arbor-monitor: INFO DIS client organization: Acme Corp
-dis-arbor-monitor: INFO DIS client description: Data from Arbor Netscout 001 
-dis-arbor-monitor: INFO DIS client contact: dis-admin@acme.com
-dis-arbor-monitor: INFO Client type name: Arbor Ingester 001
-dis-arbor-monitor: INFO Client type maker: Arbor
-dis-arbor-monitor: INFO Client type version: 0.0.0
+INFO Debug: True
+INFO Dry run: False
+INFO Bind address: 0.0.0.0
+INFO Bind port: 9080
+INFO Webhook token: ... ...
+INFO Cert chain file: None
+INFO Cert key file: None
+INFO Arbor API prefix: https://arbor-001.acme.com
+INFO Arbor API token: ... ...wxyz
+INFO DIS server API URI: https://api.dis-fqdn.example
+INFO DIS server API key: ... ...2112
+INFO DIS server max queued reports: 0
+INFO HTTP Proxy: None
+INFO Periodic report stats logging interval (minutes): 15
+INFO Syslog UDP server: None
+INFO Syslog TCP server: None
+INFO Syslog socket: None
+INFO Report storage directory: None
+INFO Report storage format: only-source-attributes
 ```
 
-If there are errors at startup connecting to the Arbor Sightline API, check the
-`DEF_ARBOR_REST_API_PREFIX`, `DEF_ARBOR_REST_API_TOKEN`, and `DEF_ARBOR_REST_API_INSECURE`
-settings in the "arbormon-container.conf" file. 
+When the monitor/client successfully connects to the DIS backend server,
+you should see log entries similar to the following in the log:
 
-If there are errors connecting to the DIS backend server, check the 
-`DEF_REPORT_CONSUMER_API_URI`, `DEF_REPORT_CONSUMER_API_KEY`, 
-and `DEF_REPORT_CONSUMER_HTTP_PROXY` settings.
+```
+DEBUG Starting new HTTPS connection (1): api.dis-fqdn.example:443
+DEBUG https://api.dis-fqdn.example:443 "GET /v1/client/me?api_key=....
+INFO DIS client name: Arbor 1
+INFO DIS client organization: Acme Corp
+INFO DIS client description: Data from Arbor Netscout 001
+INFO DIS client contact: dis-admin@acme.com
+INFO Client type name: Arbor Ingester 001
+INFO Client type maker: Arbor
+INFO Client type version: 0.0.0
+```
+
+If the log contains errors connecting to the DIS backend server, check the
+`DEF_REPORT_CONSUMER_API_URI` and `DEF_REPORT_CONSUMER_API_KEY` settings
+in the "arbormon-container.conf" file. 
+And if your network only allows HTTP connections via proxy, set the
+`DEF_REPORT_CONSUMER_HTTP_PROXY` setting (described above).
+
+When the monitor/client successfully connects to the Arbor NetScout 
+Sightline REST API, you should see log entries similar to the following in 
+the log:
+
+```
+DEBUG Starting new HTTP connection (1): https://arbor-001.acme.com
+DEBUG https://arbor-001.acme.com:443 "GET /api/sp HTTP/1.1" 200 3316
+INFO Found Arbor Sightline SP API version 7 at https://arbor-001.acme.com:443
+```
+
+If there are errors at startup connecting to the Arbor Sightline API,
+(e.g. it doesn't report the API version), check the
+`DEF_ARBOR_REST_API_PREFIX`, `DEF_ARBOR_REST_API_TOKEN`, 
+and `DEF_ARBOR_REST_API_INSECURE` settings in the "arbormon-container.conf" file. 
+And double-check the API key via the Sightline shell.
+
+###### Note: Once initialization is verified to be working, `DEF_DEBUG` should be set to `False` to avoid excessive logging and potential logging of API keys.
 
 ### Webhook Notifications
 
-To test that the client can receive webhook notifications on the host, 
-run the following curl command:
+To test that the client can receive webhook notifications on the 
+client/monitor host, you can run the following curl command on the host:
 
 ```
 curl -s -X POST 'http://127.0.0.1:8080/dis/sl-webhook' \
@@ -509,7 +542,10 @@ curl -s -X POST 'http://127.0.0.1:8080/dis/sl-webhook' \
      "id":"000000"}'
 ```
 
-If the webhook invocation is successful, you should see entries similar to the following:
+With the port number (e.g. `8080`) matching the value of the
+`DEF_BIND_PORT` setting in the "arbormon-container.conf" file.
+
+If the webhook invocation is successful, you should see log entries similar to the following:
 
 ```
 DEBUG Sightline notification payload:{
@@ -525,7 +561,7 @@ INFO Ignoring alert regarding non-DOS attack (attack ID None is a test/just_a_te
 127.0.0.1:51799 POST /dis/sl-webhook 1.1 200 44 1148
 ```
 
-If this test is successful, run the same command using the exact URL configured
+If this test is successful, you can run the test using the verbatim URL configured
 above in the Arbor NetScout Notification Group. For example:
 
 ```
@@ -543,6 +579,9 @@ ideally, from a shell on the Arbor Netscout system itself.
   then use the curl `--cacert` followed by the enterprise CA cert chain file or the 
   `--insecure` flag to disable cert chain checks when self-signed certificates are 
   being used.
+* Note: Ensure that your network allows communication from the Arbor NetScout 
+  system the webhook is invoked from to the host running the client/monitor
+  on the configured port.
 
 ### Normal Operation
 
@@ -556,12 +595,12 @@ Then once the attack is completed – and the attack metadata and source IP
 addresses have been determined – you should see log entries of the form:
 
 ```
-INFO Received notification of COMPLETED attack (Attack ID: 6831)
+INFO Received notification of COMPLETED attack (Attack ID: 2112)
 INFO Attack ID 6831: Misuse Types: None
 INFO Attack ID 6831: Start/stop time: 2020-09-08T22:51:19+00:00/2020-09-08T22:56:36+00:00
 INFO Attack ID 6831: Found 19 source IPs
-INFO Attack ID 6831: Source IPs (first 50): ['45.129.33.9', '45.129.33.12', '45.129.33.15', '45.129.33.53', '45.129.33.57', '45.129.33.60', '45.129.33.151', '94.102.49.191', '103.89.91.247', '156.38.174.66', '185.56.80.39', '185.156.73.38', '185.176.27.14', '185.176.27.26', '185.176.27.30', '185.176.27.102', '192.241.230.216', '195.54.161.122', '195.54.161.123']
-INFO Attack ID 6831: Staged event IDs: ['de5bf4d3-e753-4d98-bdec-730c3c270491']
+INFO Attack ID 6831: Source IPs (first 50): ['1.2.3.4', '5.6.7.8', '9.10.11.12', '13.14.15.16', ...]
+INFO Attack ID 6831: Staged event IDs: ['12345678-abcd-2112-abc123abc123']
 INFO Attack ID 6831: Sending report
 INFO Attack ID 6831: Report sent
 ```
