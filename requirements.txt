@@ -57,7 +57,7 @@ Quart==0.6.15
   multidict==4.5.2
   sortedcontainers==2.1.0
 requests==2.25.1
-  certifi==2020.12.5
+  certifi==2022.12.7
   chardet==4.0.0
   idna==2.10
   urllib3==1.26.5
