@@ -1,10 +1,11 @@
-import requests
 from typing import Dict
 from uuid import uuid4
 from pydantic import IPvAnyAddress
 from pydantic.types import Json, UUID4
 from typing import List, Optional
 from pydantic import BaseModel, Json, HttpUrl
+
+import httpx
 
 try:
     from devtools import debug as print
@@ -39,18 +40,19 @@ class DisClient(object):
         self._staged_limit = staged_limit
         self._events = {}
 
-    def get_info(self):
-        res = requests.get(f"{self._base_url}/v1/client/me",
-                           params={"api_key": self._key},
-                           allow_redirects=True,
-                           proxies=self._http_proxies)
-        if res.status_code == 401:
-            raise Exception("Not authorized.  Check that your API Key is correct.")
+    async def get_info(self):
+        async with httpx.AsyncClient() as httpx_client:
+            res = await httpx_client.get(f"{self._base_url}/v1/client/me",
+                                         params={"api_key": self._key},
+                                         allow_redirects=True,
+                                         proxies=self._http_proxies)
+            if res.status_code == 401:
+                raise Exception("Not authorized.  Check that your API Key is correct.")
 
-        if res.status_code != 200:
-            raise Exception(f"DIS server returned (HTTP Status: {res.status_code} ({res.reason})) accessing {self._base_url} ({res.reason})")
+            if res.status_code != 200:
+                raise Exception(f"DIS server returned (HTTP Status: {res.status_code} ({res.reason})) accessing {self._base_url} ({res.reason})")
 
-        return res.json()
+            return res.json()
 
     def get_dest(self):
         return self._dest_url
@@ -112,26 +114,26 @@ class DisClient(object):
         """Returns all staged event ids in DisClient"""
         return [k for k, v in self._events.items()]
 
-    def send(self):
+    async def send(self):
         """Sends all staged attack events to DIS and clears staged events"""
 
         events = []
         for k, v in self._events.items():
             events.append(v)
 
-        res = requests.post("{0}/data?api_key={1}".format(self._base_url, self._key),
-                            json={"events": events}, proxies=self._http_proxies)
+        async with httpx.AsyncClient() as httpx_client:
+            res = await httpx_client.post(f"{self._base_url}/data?api_key={self._key}",
+                                          json={"events": events},
+                                          proxies=self._http_proxies)
+            if 200 <= res.status_code < 400:
+                self._events = {}
+                return f"Sent {len(events)} events to {self._base_url} (HTTP Status: {res.status_code} ({res.reason}))"
 
-        if 200 <= res.status_code < 400:
-            self._events = {}
-            return f"Sent {len(events)} events to {self._base_url} (HTTP Status: {res.status_code} ({res.reason}))"
+            if 500 <= res.status_code < 600 or res.status_code == 401:
+                # Can be remedied on the server side - throw an error but don't clear the queue
+                raise Exception(f"DIS server returned recoverable server error (HTTP Status: {res.status_code} ({res.reason})) - {len(events)} reports queued")
 
-        if 500 <= res.status_code < 600 or res.status_code == 401:
-            # Can be remedied on the server side - throw an error but don't clear the queue
-            raise Exception(f"DIS server returned recoverable server error (HTTP Status: {res.status_code} ({res.reason})) - {len(events)} reports queued") 
-
-        if 400 <= res.status_code < 500:
-            # Not considered recoverable - so clear the queue
-            self._events = {}
-            raise Exception(f"DIS server returned client error (HTTP Status: {res.status_code} ({res.reason})")
-
+            if 400 <= res.status_code < 500:
+                # Not considered recoverable - so clear the queue
+                self._events = {}
+                raise Exception(f"DIS server returned client error (HTTP Status: {res.status_code} ({res.reason})")

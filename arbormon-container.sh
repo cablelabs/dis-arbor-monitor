@@ -545,7 +545,7 @@ function docker-update()
     docker-run
 }
 
-function docker-logs()
+function docker-log()
 {
     echo "Showing logs for container \"$container_name\""
     $DOCKER_CMD container logs --timestamps $container_name 2>&1 | less

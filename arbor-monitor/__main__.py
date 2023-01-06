@@ -1,18 +1,25 @@
-from quart import Quart,request, jsonify
-import json, requests, logging, logging.handlers, socket, asyncio, os, argparse, dateutil.parser, time, setproctitle
+# from quart import Quart,request, jsonify
+from fastapi import FastAPI
+from starlette.requests import Request
+
+import json, logging, logging.handlers, socket, asyncio, os, argparse, dateutil.parser, time, setproctitle, httpx
 from ipaddress import IPv4Address, IPv4Network, IPv6Network, ip_network
 from dis_client_sdk import DisClient
 from pathlib import Path
 
 #disable Warning for SSL.
-requests.packages.urllib3.disable_warnings()
+#requests.packages.urllib3.disable_warnings()
 
 default_log_prefix = "dis-arbor-sl-monitor"
 
-app = Quart(__name__)
+app = FastAPI()
+
+logger = None
+args = None
+dis_client = None
 
 @app.route('/dis/sl-webhook',methods=['POST'])
-async def process_sightline_webhook_notification():
+async def process_sightline_webhook_notification(request: Request):
     """
     This awaits data from Sightline and then parses it into an attack object.
     Once an attack has been finished (ie ongoing is False), the client will
@@ -29,7 +36,7 @@ async def process_sightline_webhook_notification():
         token = request.args.get('token')
         if args.webhook_token != token:
             logger.warning(f"Webhook invoked with missing/invalid token - IGNORING (url requested: {request.url})")
-            return jsonify({"error": "token mismatch error"}), 404, {'Content-Type': 'application/json'}
+            return {"error": "token mismatch error"}, 404, {'Content-Type': 'application/json'}
 
     data = await request.data
     payload = json.loads(data)
@@ -71,7 +78,7 @@ async def process_sightline_webhook_notification():
         msg=f"Error retrieving the source traffic report for attack {attack_id}: (HTTP Status: {response.status_code} ({response.reason})) ({response.content}))"
         logger.warning(msg)
         # Returning a 404 so Netscout so we can try to retrieve the report again
-        return jsonify({"error": msg}), 404, {'Content-Type': 'application/json'}
+        return {"error": msg}, 404, {'Content-Type': 'application/json'}
 
     src_traffic_report = response.json()
 
@@ -80,7 +87,7 @@ async def process_sightline_webhook_notification():
     else:
         warn_msg = None
         try:
-            source_ip_list = send_report_to_dis_server(attack_id, payload, src_traffic_report)
+            source_ip_list = await send_report_to_dis_server(attack_id, payload, src_traffic_report)
             total_reports_sent += 1
             total_source_ips_reported += len(source_ip_list)
             # TODO: These stats may reflect queuing - need to revisit
@@ -99,53 +106,53 @@ async def process_sightline_webhook_notification():
     if warn_msg:
         # Not returning a 400 here so Netscout doesn't keep attempting to redeliver this attack
         #  notification (causing potential duplicate reports and backing up Netscout's notify queue)
-        return jsonify({"warning": warn_msg}), 200, {'Content-Type': 'application/json'}
+        return {"warning": warn_msg}, 200, {'Content-Type': 'application/json'}
     else:
         return f"Thank you Netscout for the DDOS report! (attack ID {attack_id})", 200, {'Content-Type': 'text/plain'}
 
-def check_sightline_api_supported():
+async def check_sightline_api_supported():
     """
     Checks to ensure the Arbor SP API can be accessed and is a compatible version
 
     Return:
         True if the API checks out, and False otherwise
     """
+    async with httpx.AsyncClient(verify=not args.arbor_api_insecure) as httpx_client:
+        response = await httpx_client.get(f"{args.arbor_api_prefix}/api/sp",
+                                          headers={"X-Arbux-APIToken":args.arbor_api_token})
+        if response.status_code != 200:
+            logger.error(f"Error retrieving {response.url}: (HTTP Status: {response.status_code} ({response.reason}))")
+            return False
 
-    response = requests.get(f"{args.arbor_api_prefix}/api/sp",
-                            verify=not args.arbor_api_insecure,
-                            headers={"X-Arbux-APIToken":args.arbor_api_token})
-    if response.status_code != requests.codes.ok:
-        logger.error(f"Error retrieving {response.url}: (HTTP Status: {response.status_code} ({response.reason}))")
-        return False
+        json_response = response.json()
+        api_type = json_response['meta']['api']
+        api_version = int(json_response['meta']['api_version'])
 
-    json_response = response.json()
-    api_type = json_response['meta']['api']
-    api_version = int(json_response['meta']['api_version'])
+        if api_type != 'SP':
+            logger.error(f"Found unsupported Sightline API (found '{api_type}', expected 'SP'")
+            return False
 
-    if api_type != 'SP':
-        logger.error(f"Found unsupported Sightline API (found '{api_type}', expected 'SP'")
-        return False
+        if api_version < 6:
+            logger.error(f"Found unsupported Sightline API version ({api_version} < 6)")
+            return False
 
-    if api_version < 6:
-        logger.error(f"Found unsupported Sightline API version ({api_version} < 6)")
-        return False
-
-    logger.info(f"Found Arbor Sightline SP API version {api_version} at {response.url}")
-
-    return True
+        logger.info(f"Found Arbor Sightline SP API version {api_version} at {response.url}")
+        return True
 
 
-def get_src_traffic_report(attack_id):
+async def get_src_traffic_report(attack_id):
     # The default for this query is normally 5 source IPs. So need to make sure to over-ride the default limit
     prefix_query_limit=1000000
-    response = requests.get(f"{args.arbor_api_prefix}/api/sp/v6/alerts/{attack_id}/traffic/src_prefixes/"
-                            f"?query_unit=bps&query_limit={prefix_query_limit}&query_view=network",
-                            verify=not args.arbor_api_insecure,
-                            headers={"X-Arbux-APIToken":args.arbor_api_token})
-    return response
+    async with httpx.AsyncClient() as httpx_client:
+        # Get the AP Group(s)
+        response = await httpx_client.get(f"{args.arbor_api_prefix}/api/sp/v6/alerts/{attack_id}/traffic/src_prefixes/"
+                                          f"?query_unit=bps&query_limit={prefix_query_limit}&query_view=network",
+                                          verify=not args.arbor_api_insecure,
+                                          headers={"X-Arbux-APIToken": args.arbor_api_token})
+        return response
 
 
-def send_report_to_dis_server(attack_id, attack_payload, src_traffic_report):
+async def send_report_to_dis_server(attack_id, attack_payload, src_traffic_report):
     attack_attributes = attack_payload.get("data").get("attributes")
 
     attack_subobjects = attack_attributes.get("subobject")
@@ -183,14 +190,15 @@ def send_report_to_dis_server(attack_id, attack_payload, src_traffic_report):
         logger.info(f"Attack ID {attack_id}: Staged event IDs: {staged_event_ids}")
         # TODO: Add accessor for the DIS client base URL so we can log it
         logger.info(f"Attack ID {attack_id}: Sending report to DIS server")
-        msg = dis_client.send()
+        msg = await dis_client.send()
         logger.info(f"Attack ID {attack_id}: Report sent/queued to DIS server ({msg})")
     except Exception as ex:
         logger.warning(f"Caught an exception uploading attack(s) ({ex})")
 
     return source_ip_list
 
-def send_event(event_object, post_url):
+
+async def send_event(event_object, post_url):
     """
     Sends event to consumer URL.
 
@@ -201,13 +209,14 @@ def send_event(event_object, post_url):
     POST request response.
 
     """
-    logger.info(f"POSTing to {post_url}")
-    logger.debug(json.dumps(event_object, indent=3))
-    r = requests.post(url=post_url, json=event_object, headers={"Content-Type": "application/json"})
-    logger.debug("POST response: " + r.text)
+    async with httpx.AsyncClient() as httpx_client:
+        logger.info(f"POSTing to {post_url}")
+        logger.debug(json.dumps(event_object, indent=3))
+        response = await httpx_client.post(post_url, json=event_object, headers={"Content-Type": "application/json"})
+        logger.debug("POST response: " + response.content)
 
 
-def add_source_ips_v1(dis_event, attack_id):
+async def add_source_ips_v1(dis_event, attack_id):
     """
     Makes a request to Arbor instance for the source IP that match the Attack ID:
 
@@ -220,19 +229,20 @@ def add_source_ips_v1(dis_event, attack_id):
     The list of source IPs added
 
     """
-    response = requests.get(f"{args.arbor_api_prefix}/api/sp/v6/alerts/{attack_id}/source_ip_addresses",
-                            verify=not args.arbor_api_insecure,
-                            headers={"X-Arbux-APIToken":args.arbor_api_token})
-    json_response = response.json()
-    attack_source_ips = json_response['data']['attributes']['source_ips']
+    async with httpx.AsyncClient() as httpx_client:
+        response = await httpx_client.post(f"{args.arbor_api_prefix}/api/sp/v6/alerts/{attack_id}/source_ip_addresses",
+                                           verify=not args.arbor_api_insecure,
+                                           headers={"X-Arbux-APIToken":args.arbor_api_token})
+        json_response = response.json()
+        attack_source_ips = json_response['data']['attributes']['source_ips']
 
-    if args.dry_run:
-        logger.info(f"Attack ID {attack_id}: Running in DRY RUN mode - not posting attack")
+        if args.dry_run:
+            logger.info(f"Attack ID {attack_id}: Running in DRY RUN mode - not posting attack")
 
-    if dis_client and dis_event:
-        for attack_source_ip in attack_source_ips:
-            dis_client.add_attack_source_to_event(dis_event, ip=attack_source_ip)
-    return attack_source_ips
+        if dis_client and dis_event:
+            for attack_source_ip in attack_source_ips:
+                dis_client.add_attack_source_to_event(dis_event, ip=attack_source_ip)
+        return attack_source_ips
 
 
 def add_source_ips_v2(dis_client, dis_event, attack_id, src_traffic_report):
@@ -374,259 +384,270 @@ async def perform_periodic_status_reports(report_interval_mins):
         ip_count_delta = total_source_ips_reported - pre_count_ips
         logger.info(f"STATUS REPORT: Sent {report_count_delta} reports (with {ip_count_delta} source IPs) in {(time_delta/60):.3} minutes")
 
-# MAIN
 
-arg_parser = argparse.ArgumentParser(description='Monitors for Arbor attack events and posts source address reports "'
-                                                 'to the specified event consumer')
+async def main():
+    global logger
+    global args
+    global dis_client
 
-arg_parser.add_argument ('--debug', "-d,", required=False, action='store_true',
-                         default = os.environ.get('DIS_ARBORMON_DEBUG') == "True",
-                         help="Enables debugging output/checks")
-arg_parser.add_argument ('--dry-run', "-dr,", required=False, action='store_true',
-                         default = os.environ.get('DIS_ARBORMON_DRY_RUN') == "True",
-                         help="Enables a dry-tun test (doesn't upload to a server - just logs)")
-arg_parser.add_argument ('--bind-address', "-a", required=False, action='store',
-                         type=str, metavar="bind_address",
-                         default=os.environ.get('DIS_ARBORMON_BIND_ADDRESS', "0.0.0.0"),
-                         help="specify the address to bind the HTTP/HTTPS server to for receiving "
-                              "Arbor SP webhook notifications (or set DIS_ARBORMON_BIND_ADDRESS)")
-arg_parser.add_argument ('--bind-port', "-p", required=False, action='store', type=int,
-                         default = os.environ.get('DIS_ARBORMON_BIND_PORT', 443), metavar="bind_port",
-                         help="specify the port to bind the HTTP/HTTPS server to for receiving "
-                              "Arbor SP webhook notifications (or set DIS_ARBORMON_BIND_PORT)")
-arg_parser.add_argument ('--webhook-token', "-wt", required=False, action='store', type=str,
-                         default = os.environ.get('DIS_ARBORMON_WEBHOOK_TOKEN'), metavar="token",
-                         help="specify an optional token URI parameter the HTTP/HTTPS server will "
-                              "require for Arbor SP webhook notifications (e.g. /dis/sl-webhook&token=abcd)"
-                              "(or set DIS_ARBORMON_WEBHOOK_TOKEN)")
-arg_parser.add_argument ('--cert-chain-file', "-ccf", required=False, action='store', type=open,
-                         default = os.environ.get('DIS_ARBORMON_CERT_FILE'), metavar="cert_file",
-                         help="the file path containing the certificate chain to use for the "
-                              "HTTPS server connection for receiving Arbor SP webhook notifications "
-                              "(or set DIS_ARBORMON_CERT_FILE). If not set, only HTTP webhook "
-                              "connections will be supported (HTTPS will be disabled).")
-arg_parser.add_argument ('--cert-key-file', "-ckf", required=False, action='store', type=open,
-                         default = os.environ.get('DIS_ARBORMON_KEY_FILE'), metavar="cert_key_file",
-                         help="the file path containing the key for the associated leaf certificate " 
-                              "contained in the certificate chain file for the HTTPS server connection"
-                              "for receiving Arbor SP webhook notification (or DIS_ARBORMON_KEY_FILE)")
-arg_default = os.environ.get('DIS_ARBORMON_REST_API_PREFIX')
-arg_parser.add_argument ('--arbor-api-prefix', "-aap", required=not arg_default,
-                         action='store', type=str, default=arg_default, metavar="url_prefix",
-                         help="Specify the Arbor API prefix to use for REST calls "
-                              "(e.g. 'https://arbor001.acme.com') "
-                              "(or set DIS_ARBORMON_REST_API_PREFIX)")
-arg_default=os.environ.get('DIS_ARBORMON_REST_API_TOKEN')
-arg_parser.add_argument ('--arbor-api-token', "-aat,", required=not arg_default,
-                         action='store', type=str, default=arg_default, metavar="api_token",
-                         help="Specify the Arbor API token to use for REST calls "
-                              "(or DIS_ARBORMON_REST_API_TOKEN)")
-arg_parser.add_argument ('--arbor-api-insecure', "-aai", required=False,
-                         action='store_true', default=os.environ.get('DIS_ARBORMON_REST_API_INSECURE',False),
-                         help="Disable cert checks when invoking Arbor SP API REST calls "
-                              "(or DIS_ARBORMON_REST_API_INSECURE)")
-arg_default=os.environ.get('DIS_ARBORMON_REPORT_API_URI')
-arg_parser.add_argument ('--report-consumer-api-uri', "-rcuri", required=not arg_default,
-                         action='store', type=str, default=arg_default, metavar="api_uri",
-                         help="Specify the API prefix of the DIS server to submit DIS attack reports to"
-                              "(or DIS_ARBORMON_REPORT_API_URI)")
-arg_default=os.environ.get('DIS_ARBORMON_REPORT_API_KEY')
-arg_parser.add_argument ('--report-consumer-api-key', "-rckey", required=not arg_default,
-                         action='store', type=str, default=arg_default, metavar="api_key",
-                         help="Specify the API key to use for submitting attack reports "
-                              "(or DIS_ARBORMON_REPORT_API_KEY)")
-arg_parser.add_argument ('--http-proxy', "-hpu,", required=False, action='store',
-                         type=str, metavar="http_proxy",
-                         default=os.environ.get('DIS_ARBORMON_HTTP_PROXY'),
-                         help="Specify the HTTP/HTTPS proxy URL for sending reports to the DIS server "
-                              "(or DIS_ARBORMON_HTTP_PROXY). e.g. 'http://10.0.1.11:1234', 'https://proxy.acme.com:8080'")
-arg_parser.add_argument ('--max-queued-reports', "-rcmqr,", required=False, action='store',
-                         type=int, metavar="max_num_queued",
-                         default=os.environ.get('DIS_ARBORMON_MAX_QUEUED_REPORTS', 0),
-                         help="Specify the maximum number of DIS reports to queue if/when there's a transient "
-                              "issue sending a report(s) to the DIS server (or DIS_ARBORMON_MAX_QUEUED_REPORTS)")
-arg_parser.add_argument ('--syslog-server', "-slsu", required=False, action='store',
-                         type=str, metavar="server",
-                         default=os.environ.get('DIS_ARBORMON_SYSLOG_SERVER'),
-                         help="Specify a syslog server for logging error/info messages using UDP "
-                              "datagrams (or DIS_ARBORMON_SYSLOG_SERVER) in the format \"server\" "
-                              "or \"server:udp-port\"")
-arg_parser.add_argument ('--syslog-tcp-server', "-slst", required=False, action='store',
-                         type=str, metavar="tcp_server",
-                         default=os.environ.get('DIS_ARBORMON_SYSLOG_TCP_SERVER'),
-                         help="Specify a syslog server for logging error/info messages using a TCP "
-                              "connection (or DIS_ARBORMON_SYSLOG_TCP_SERVER) in the format \"server\" "
-                              "or \"server:udp-port\"")
-arg_parser.add_argument ('--syslog-socket', "-sls", required=False, action='store',
-                         type=str, metavar="socket_file",
-                         default=os.environ.get('DIS_ARBORMON_SYSLOG_SOCKET'),
-                         help="Specify a syslog named socket for logging error/info messages "
-                              "(or DIS_ARBORMON_SYSLOG_SOCKET)")
-arg_parser.add_argument ('--syslog-facility', "-slf", required=False, action='store',
-                         type=int, metavar="syslog_facility_code",
-                         default=os.environ.get('DIS_ARBORMON_SYSLOG_FACILITY',
-                                                logging.handlers.SysLogHandler.LOG_USER),
-                         help="Specify a syslog facility code for all syslog messages  "
-                              f"(or DIS_ARBORMON_SYSLOG_FACILITY). Default: LOG_USER")
-arg_parser.add_argument ('--log-prefix', "-lp", required=False, action='store',
-                         type=str, metavar="prefix_string",
-                         default=os.environ.get('DIS_ARBORMON_LOG_PREFIX', default_log_prefix),
-                         help="Specify a prefix string for logging error/info messages "
-                              "(or DIS_ARBORMON_LOG_PREFIX)")
-arg_parser.add_argument ('--log-report-stats', "-lrs", required=False, action='store',
-                         type=int, metavar="interval_minutes",
-                         default=os.environ.get('DIS_ARBORMON_LOG_REPORT_STATS'),
-                         help="Enable info-level periodic reporting of attack/report statistics "
-                              "(or set DIS_ARBORMON_LOG_REPORT_STATS)")
-arg_parser.add_argument ('--report-store-dir', "-repd", required=False, action='store',
-                         type=str, metavar="dest-directory",
-                         default=os.environ.get('DIS_ARBORMON_REPORT_STORE_DIR'),
-                         help="Specify a directory to store generated json reports to "
-                              "(or DIS_ARBORMON_REPORT_STORE_DIR)")
-storage_format_choices=["only-source-attributes","all-attributes"]
-arg_parser.add_argument ('--report-store-format', "-repf", required=False, action='store',
-                         type=str, metavar="format-name", choices=storage_format_choices,
-                         default=os.environ.get('DIS_ARBORMON_REPORT_STORE_FORMAT', "only-source-attributes"),
-                         help="Specify the report format to use when writing reports "
-                              f"(or DIS_ARBORMON_REPORT_STORE_FORMAT). One of {storage_format_choices}")
+    arg_parser = argparse.ArgumentParser(description='Monitors for Arbor attack events and posts source address reports "'
+                                                     'to the specified event consumer')
 
-args = arg_parser.parse_args()
+    arg_parser.add_argument ('--debug', "-d,", required=False, action='store_true',
+                             default = os.environ.get('DIS_ARBORMON_DEBUG') == "True",
+                             help="Enables debugging output/checks")
+    arg_parser.add_argument ('--dry-run', "-dr,", required=False, action='store_true',
+                             default = os.environ.get('DIS_ARBORMON_DRY_RUN') == "True",
+                             help="Enables a dry-tun test (doesn't upload to a server - just logs)")
+    arg_parser.add_argument ('--bind-address', "-a", required=False, action='store',
+                             type=str, metavar="bind_address",
+                             default=os.environ.get('DIS_ARBORMON_BIND_ADDRESS', "0.0.0.0"),
+                             help="specify the address to bind the HTTP/HTTPS server to for receiving "
+                                  "Arbor SP webhook notifications (or set DIS_ARBORMON_BIND_ADDRESS)")
+    arg_parser.add_argument ('--bind-port', "-p", required=False, action='store', type=int,
+                             default = os.environ.get('DIS_ARBORMON_BIND_PORT', 443), metavar="bind_port",
+                             help="specify the port to bind the HTTP/HTTPS server to for receiving "
+                                  "Arbor SP webhook notifications (or set DIS_ARBORMON_BIND_PORT)")
+    arg_parser.add_argument ('--webhook-token', "-wt", required=False, action='store', type=str,
+                             default = os.environ.get('DIS_ARBORMON_WEBHOOK_TOKEN'), metavar="token",
+                             help="specify an optional token URI parameter the HTTP/HTTPS server will "
+                                  "require for Arbor SP webhook notifications (e.g. /dis/sl-webhook&token=abcd)"
+                                  "(or set DIS_ARBORMON_WEBHOOK_TOKEN)")
+    arg_parser.add_argument ('--cert-chain-file', "-ccf", required=False, action='store', type=open,
+                             default = os.environ.get('DIS_ARBORMON_CERT_FILE'), metavar="cert_file",
+                             help="the file path containing the certificate chain to use for the "
+                                  "HTTPS server connection for receiving Arbor SP webhook notifications "
+                                  "(or set DIS_ARBORMON_CERT_FILE). If not set, only HTTP webhook "
+                                  "connections will be supported (HTTPS will be disabled).")
+    arg_parser.add_argument ('--cert-key-file', "-ckf", required=False, action='store', type=open,
+                             default = os.environ.get('DIS_ARBORMON_KEY_FILE'), metavar="cert_key_file",
+                             help="the file path containing the key for the associated leaf certificate "
+                                  "contained in the certificate chain file for the HTTPS server connection"
+                                  "for receiving Arbor SP webhook notification (or DIS_ARBORMON_KEY_FILE)")
+    arg_default = os.environ.get('DIS_ARBORMON_REST_API_PREFIX')
+    arg_parser.add_argument ('--arbor-api-prefix', "-aap", required=not arg_default,
+                             action='store', type=str, default=arg_default, metavar="url_prefix",
+                             help="Specify the Arbor API prefix to use for REST calls "
+                                  "(e.g. 'https://arbor001.acme.com') "
+                                  "(or set DIS_ARBORMON_REST_API_PREFIX)")
+    arg_default=os.environ.get('DIS_ARBORMON_REST_API_TOKEN')
+    arg_parser.add_argument ('--arbor-api-token', "-aat,", required=not arg_default,
+                             action='store', type=str, default=arg_default, metavar="api_token",
+                             help="Specify the Arbor API token to use for REST calls "
+                                  "(or DIS_ARBORMON_REST_API_TOKEN)")
+    arg_parser.add_argument ('--arbor-api-insecure', "-aai", required=False,
+                             action='store_true', default=os.environ.get('DIS_ARBORMON_REST_API_INSECURE',False),
+                             help="Disable cert checks when invoking Arbor SP API REST calls "
+                                  "(or DIS_ARBORMON_REST_API_INSECURE)")
+    arg_default=os.environ.get('DIS_ARBORMON_REPORT_API_URI')
+    arg_parser.add_argument ('--report-consumer-api-uri', "-rcuri", required=not arg_default,
+                             action='store', type=str, default=arg_default, metavar="api_uri",
+                             help="Specify the API prefix of the DIS server to submit DIS attack reports to"
+                                  "(or DIS_ARBORMON_REPORT_API_URI)")
+    arg_default=os.environ.get('DIS_ARBORMON_REPORT_API_KEY')
+    arg_parser.add_argument ('--report-consumer-api-key', "-rckey", required=not arg_default,
+                             action='store', type=str, default=arg_default, metavar="api_key",
+                             help="Specify the API key to use for submitting attack reports "
+                                  "(or DIS_ARBORMON_REPORT_API_KEY)")
+    arg_parser.add_argument ('--http-proxy', "-hpu,", required=False, action='store',
+                             type=str, metavar="http_proxy",
+                             default=os.environ.get('DIS_ARBORMON_HTTP_PROXY'),
+                             help="Specify the HTTP/HTTPS proxy URL for sending reports to the DIS server "
+                                  "(or DIS_ARBORMON_HTTP_PROXY). e.g. 'http://10.0.1.11:1234', 'https://proxy.acme.com:8080'")
+    arg_parser.add_argument ('--max-queued-reports', "-rcmqr,", required=False, action='store',
+                             type=int, metavar="max_num_queued",
+                             default=os.environ.get('DIS_ARBORMON_MAX_QUEUED_REPORTS', 0),
+                             help="Specify the maximum number of DIS reports to queue if/when there's a transient "
+                                  "issue sending a report(s) to the DIS server (or DIS_ARBORMON_MAX_QUEUED_REPORTS)")
+    arg_parser.add_argument ('--syslog-server', "-slsu", required=False, action='store',
+                             type=str, metavar="server",
+                             default=os.environ.get('DIS_ARBORMON_SYSLOG_SERVER'),
+                             help="Specify a syslog server for logging error/info messages using UDP "
+                                  "datagrams (or DIS_ARBORMON_SYSLOG_SERVER) in the format \"server\" "
+                                  "or \"server:udp-port\"")
+    arg_parser.add_argument ('--syslog-tcp-server', "-slst", required=False, action='store',
+                             type=str, metavar="tcp_server",
+                             default=os.environ.get('DIS_ARBORMON_SYSLOG_TCP_SERVER'),
+                             help="Specify a syslog server for logging error/info messages using a TCP "
+                                  "connection (or DIS_ARBORMON_SYSLOG_TCP_SERVER) in the format \"server\" "
+                                  "or \"server:udp-port\"")
+    arg_parser.add_argument ('--syslog-socket', "-sls", required=False, action='store',
+                             type=str, metavar="socket_file",
+                             default=os.environ.get('DIS_ARBORMON_SYSLOG_SOCKET'),
+                             help="Specify a syslog named socket for logging error/info messages "
+                                  "(or DIS_ARBORMON_SYSLOG_SOCKET)")
+    arg_parser.add_argument ('--syslog-facility', "-slf", required=False, action='store',
+                             type=int, metavar="syslog_facility_code",
+                             default=os.environ.get('DIS_ARBORMON_SYSLOG_FACILITY',
+                                                    logging.handlers.SysLogHandler.LOG_USER),
+                             help="Specify a syslog facility code for all syslog messages  "
+                                  f"(or DIS_ARBORMON_SYSLOG_FACILITY). Default: LOG_USER")
+    arg_parser.add_argument ('--log-prefix', "-lp", required=False, action='store',
+                             type=str, metavar="prefix_string",
+                             default=os.environ.get('DIS_ARBORMON_LOG_PREFIX', default_log_prefix),
+                             help="Specify a prefix string for logging error/info messages "
+                                  "(or DIS_ARBORMON_LOG_PREFIX)")
+    arg_parser.add_argument ('--log-report-stats', "-lrs", required=False, action='store',
+                             type=int, metavar="interval_minutes",
+                             default=os.environ.get('DIS_ARBORMON_LOG_REPORT_STATS'),
+                             help="Enable info-level periodic reporting of attack/report statistics "
+                                  "(or set DIS_ARBORMON_LOG_REPORT_STATS)")
+    arg_parser.add_argument ('--report-store-dir', "-repd", required=False, action='store',
+                             type=str, metavar="dest-directory",
+                             default=os.environ.get('DIS_ARBORMON_REPORT_STORE_DIR'),
+                             help="Specify a directory to store generated json reports to "
+                                  "(or DIS_ARBORMON_REPORT_STORE_DIR)")
+    storage_format_choices=["only-source-attributes","all-attributes"]
+    arg_parser.add_argument ('--report-store-format', "-repf", required=False, action='store',
+                             type=str, metavar="format-name", choices=storage_format_choices,
+                             default=os.environ.get('DIS_ARBORMON_REPORT_STORE_FORMAT', "only-source-attributes"),
+                             help="Specify the report format to use when writing reports "
+                                  f"(or DIS_ARBORMON_REPORT_STORE_FORMAT). One of {storage_format_choices}")
 
-logging_filename=None
-logging_filemode=None
-logging.basicConfig (level=(logging.DEBUG if args.debug else logging.INFO),
-                     filename=logging_filename, filemode=logging_filemode,
-                     format='%(asctime)s %(name)s: %(levelname)s %(message)s')
-logger = logging.getLogger(args.log_prefix)
+    args = arg_parser.parse_args()
 
-cert_chain_filename = args.cert_chain_file.name if args.cert_chain_file else None
-cert_key_filename = args.cert_key_file.name if args.cert_key_file else None
+    logging_filename=None
+    logging_filemode=None
+    logging.basicConfig (level=(logging.DEBUG if args.debug else logging.INFO),
+                         filename=logging_filename, filemode=logging_filemode,
+                         format='%(asctime)s %(name)s: %(levelname)s %(message)s')
+    logger = logging.getLogger(args.log_prefix)
 
-logger.info(f"Debug: {args.debug}")
-logger.info(f"Dry run: {args.dry_run}")
-logger.info(f"Bind address: {args.bind_address}")
-logger.info(f"Bind port: {args.bind_port}")
-logger.info(f"Webhook token: ... ...{args.webhook_token[-4:] if args.webhook_token else ''}")
-logger.info(f"Cert chain file: {cert_chain_filename}")
-logger.info(f"Cert key file: {cert_key_filename}")
-logger.info(f"Arbor API prefix: {args.arbor_api_prefix}")
-logger.info(f"Arbor API token: ... ...{args.arbor_api_token[-4:] if args.arbor_api_token else ''}")
-logger.info(f"DIS server API URI: {args.report_consumer_api_uri}")
-logger.info(f"DIS server API key: ... ...{args.report_consumer_api_key[-4:] if args.report_consumer_api_key else ''}")
-logger.info(f"DIS server max queued reports: {args.max_queued_reports}")
-logger.info(f"HTTP Proxy: {args.http_proxy}")
-logger.info(f"Periodic report stats logging interval (minutes): {args.log_report_stats}")
-logger.info(f"Syslog UDP server: {args.syslog_server}")
-logger.info(f"Syslog TCP server: {args.syslog_tcp_server}")
-logger.info(f"Syslog socket: {args.syslog_socket}")
-logger.info(f"Report storage directory: {args.report_store_dir}")
-logger.info(f"Report storage format: {args.report_store_format}")
+    cert_chain_filename = args.cert_chain_file.name if args.cert_chain_file else None
+    cert_key_filename = args.cert_key_file.name if args.cert_key_file else None
 
-if args.dry_run:
-    logger.info("RUNNING IN DRY-RUN MODE (not connecting/reporting to the DIS server)")
-else:
-    dis_client = DisClient(api_uri=args.report_consumer_api_uri, api_key=args.report_consumer_api_key,
-                           staged_limit=args.max_queued_reports, http_proxy=args.http_proxy)
-    try:
-        dis_client_info = dis_client.get_info()
-        logger.info(f"DIS client name: {dis_client_info.get('name')}")
-        org = dis_client_info.get("organization")
-        logger.info(f"DIS client organization: {org.get('name') if org else 'Unknown'}")
-        logger.info(f"DIS client description: {dis_client_info.get('shortDescription')}")
-        logger.info(f"DIS client contact: {org.get('contactEmail')}")
-        client_type = dis_client_info.get("clientType")
-        logger.info(f"Client type name: {client_type.get('name')}")
-        logger.info(f"Client type maker: {client_type.get('maker')}")
-        logger.info(f"Client type version: {client_type.get('version')}")
-        # TODO: Check the maker (and version?)
-    except Exception as ex:
-        logger.warning(f"Error getting client info from DIS server: {ex}")
+    logger.info(f"Debug: {args.debug}")
+    logger.info(f"Dry run: {args.dry_run}")
+    logger.info(f"Bind address: {args.bind_address}")
+    logger.info(f"Bind port: {args.bind_port}")
+    logger.info(f"Webhook token: ... ...{args.webhook_token[-4:] if args.webhook_token else ''}")
+    logger.info(f"Cert chain file: {cert_chain_filename}")
+    logger.info(f"Cert key file: {cert_key_filename}")
+    logger.info(f"Arbor API prefix: {args.arbor_api_prefix}")
+    logger.info(f"Arbor API token: ... ...{args.arbor_api_token[-4:] if args.arbor_api_token else ''}")
+    logger.info(f"DIS server API URI: {args.report_consumer_api_uri}")
+    logger.info(f"DIS server API key: ... ...{args.report_consumer_api_key[-4:] if args.report_consumer_api_key else ''}")
+    logger.info(f"DIS server max queued reports: {args.max_queued_reports}")
+    logger.info(f"HTTP Proxy: {args.http_proxy}")
+    logger.info(f"Periodic report stats logging interval (minutes): {args.log_report_stats}")
+    logger.info(f"Syslog UDP server: {args.syslog_server}")
+    logger.info(f"Syslog TCP server: {args.syslog_tcp_server}")
+    logger.info(f"Syslog socket: {args.syslog_socket}")
+    logger.info(f"Report storage directory: {args.report_store_dir}")
+    logger.info(f"Report storage format: {args.report_store_format}")
 
-# Note: Setting up syslog after logging above here - so the above doesn't go into syslog
-syslog_formatter = logging.Formatter("%(name)s: %(message)s")
+    if args.dry_run:
+        logger.info("RUNNING IN DRY-RUN MODE (not connecting/reporting to the DIS server)")
+    else:
+        dis_client = DisClient(api_uri=args.report_consumer_api_uri, api_key=args.report_consumer_api_key,
+                               staged_limit=args.max_queued_reports, http_proxy=args.http_proxy)
+        try:
+            dis_client_info = await dis_client.get_info()
+            logger.info(f"DIS client name: {dis_client_info.get('name')}")
+            org = dis_client_info.get("organization")
+            logger.info(f"DIS client organization: {org.get('name') if org else 'Unknown'}")
+            logger.info(f"DIS client description: {dis_client_info.get('shortDescription')}")
+            logger.info(f"DIS client contact: {org.get('contactEmail')}")
+            client_type = dis_client_info.get("clientType")
+            logger.info(f"Client type name: {client_type.get('name')}")
+            logger.info(f"Client type maker: {client_type.get('maker')}")
+            logger.info(f"Client type version: {client_type.get('version')}")
+            # TODO: Check the maker (and version?)
+        except Exception as ex:
+            logger.warning(f"Error getting client info from DIS server: {ex}")
 
-if args.syslog_server:
-    server_split = args.syslog_server.split(':')
-    if len(server_split) > 2:
-        logger.error(f"Error: The syslog hostname param cannot have more than one colon (found \"{args.syslog_server}\")")
-        exit(10)
-    try:
-        syslog_hostname = server_split[0]
-        if len(server_split) == 2:
+    # Note: Setting up syslog after logging above here - so the above doesn't go into syslog
+    syslog_formatter = logging.Formatter("%(name)s: %(message)s")
+
+    if args.syslog_server:
+        server_split = args.syslog_server.split(':')
+        if len(server_split) > 2:
+            logger.error(f"Error: The syslog hostname param cannot have more than one colon (found \"{args.syslog_server}\")")
+            exit(10)
+        try:
+            syslog_hostname = server_split[0]
+            if len(server_split) == 2:
+                syslog_port = int(server_split[1])
+            else:
+                syslog_port = logging.handlers.SYSLOG_UDP_PORT
+
+            syslog_handler = logging.handlers.SysLogHandler(address=(syslog_hostname, syslog_port),
+                                                            facility=args.syslog_facility,
+                                                            socktype=socket.SOCK_DGRAM)
+            syslog_handler.setFormatter(syslog_formatter)
+            logger.addHandler(syslog_handler)
+        except Exception as ex:
+            logger.info(f"Error creating datagram syslog handler for {args.syslog_server}: {ex}")
+            exit(11)
+
+    if args.syslog_tcp_server:
+        server_split = args.syslog_tcp_server.split(':')
+        if len(server_split) != 2:
+            logger.error(f"Error: Expecting syslog TCP server option form server:port (found \"{args.syslog_tcp_server}\")")
+            exit(20)
+        try:
+            syslog_hostname = server_split[0]
             syslog_port = int(server_split[1])
-        else:
-            syslog_port = logging.handlers.SYSLOG_UDP_PORT
+            syslog_handler = logging.handlers.SysLogHandler(address=(syslog_hostname, syslog_port),
+                                                            facility=args.syslog_facility,
+                                                            socktype=socket.SOCK_STREAM)
+            syslog_handler.setFormatter(syslog_formatter)
+            logger.addHandler(syslog_handler)
+        except Exception as ex:
+            logger.info(f"Error creating syslog TCP handler for {args.syslog_tcp_server}: {ex}")
+            exit(21)
 
-        syslog_handler = logging.handlers.SysLogHandler(address=(syslog_hostname, syslog_port),
-                                                        facility=args.syslog_facility,
-                                                        socktype=socket.SOCK_DGRAM)
-        syslog_handler.setFormatter(syslog_formatter)
-        logger.addHandler(syslog_handler)
-    except Exception as ex:
-        logger.info(f"Error creating datagram syslog handler for {args.syslog_server}: {ex}")
-        exit(11)
+    if args.syslog_socket:
+        try:
+            syslog_handler = logging.handlers.SysLogHandler(address=args.syslog_socket,
+                                                            facility=args.syslog_facility)
+            syslog_handler.setFormatter(syslog_formatter)
+            logger.addHandler(syslog_handler)
+        except Exception as ex:
+            logger.info(f"Error creating syslog named socket handler for {args.syslog_socket}: {ex}")
+            exit(21)
 
-if args.syslog_tcp_server:
-    server_split = args.syslog_tcp_server.split(':')
-    if len(server_split) != 2:
-        logger.error(f"Error: Expecting syslog TCP server option form server:port (found \"{args.syslog_tcp_server}\")")
-        exit(20)
-    try:
-        syslog_hostname = server_split[0]
-        syslog_port = int(server_split[1])
-        syslog_handler = logging.handlers.SysLogHandler(address=(syslog_hostname, syslog_port),
-                                                        facility=args.syslog_facility,
-                                                        socktype=socket.SOCK_STREAM)
-        syslog_handler.setFormatter(syslog_formatter)
-        logger.addHandler(syslog_handler)
-    except Exception as ex:
-        logger.info(f"Error creating syslog TCP handler for {args.syslog_tcp_server}: {ex}")
-        exit(21)
+    if args.report_store_dir:
+        report_storage_path = Path(args.report_store_dir)
+        if not report_storage_path.is_dir():
+            logger.error(f"Error: The report storage path is not a directory (dest: \"{args.report_store_dir}\")")
+            exit(30)
+        if not os.access(report_storage_path.absolute(), os.W_OK):
+            logger.error(f"Error: The report storage path is not writable (dest: \"{args.report_store_dir}\")")
+            exit(30)
+    else:
+        report_storage_path = None
 
-if args.syslog_socket:
-    try:
-        syslog_handler = logging.handlers.SysLogHandler(address=args.syslog_socket,
-                                                        facility=args.syslog_facility)
-        syslog_handler.setFormatter(syslog_formatter)
-        logger.addHandler(syslog_handler)
-    except Exception as ex:
-        logger.info(f"Error creating syslog named socket handler for {args.syslog_socket}: {ex}")
-        exit(21)
+    if not await check_sightline_api_supported():
+        logger.error("Exiting due to lack of Arbor SP API support")
+        exit(0)
 
-if args.report_store_dir:
-    report_storage_path = Path(args.report_store_dir)
-    if not report_storage_path.is_dir():
-        logger.error(f"Error: The report storage path is not a directory (dest: \"{args.report_store_dir}\")")
-        exit(30)
-    if not os.access(report_storage_path.absolute(), os.W_OK):
-        logger.error(f"Error: The report storage path is not writable (dest: \"{args.report_store_dir}\")")
-        exit(30)
-else:
-    report_storage_path = None
+    total_reports_sent = 0
+    total_source_ips_reported = 0
 
-if not check_sightline_api_supported():
-    logger.error("Exiting due to lack of Arbor SP API support")
-    exit(0)
+    if args.log_report_stats:
+        start_status_reporting(args.log_report_stats)
 
-total_reports_sent = 0
-total_source_ips_reported = 0
+    # Hide sensitive command line arguments
+    cur_proc_title = setproctitle.getproctitle()
 
-if args.log_report_stats:
-    start_status_reporting(args.log_report_stats)
+    if args.arbor_api_token:
+        cur_proc_title = cur_proc_title.replace(args.arbor_api_token, "[token hidden]")
 
-# Hide sensitive command line arguments
-cur_proc_title = setproctitle.getproctitle()
+    if args.report_consumer_api_key:
+        cur_proc_title = cur_proc_title.replace(args.report_consumer_api_key, "[key hidden]")
 
-if args.arbor_api_token:
-    cur_proc_title = cur_proc_title.replace(args.arbor_api_token, "[token hidden]")
+    if args.webhook_token:
+        cur_proc_title = cur_proc_title.replace(args.webhook_token, "[token hidden]")
 
-if args.report_consumer_api_key:
-    cur_proc_title = cur_proc_title.replace(args.report_consumer_api_key, "[key hidden]")
+    setproctitle.setproctitle(cur_proc_title)
 
-if args.webhook_token:
-    cur_proc_title = cur_proc_title.replace(args.webhook_token, "[token hidden]")
+    # Use this for debugging purposes only
+    import uvicorn
 
-setproctitle.setproctitle(cur_proc_title)
+    uvicorn.run(app, debug=args.debug, host=args.bind_address, port=args.bind_port,
+                certfile=cert_chain_filename, keyfile=cert_key_filename)
 
-app.run(debug=args.debug, host=args.bind_address, port=args.bind_port,
-        certfile=cert_chain_filename, keyfile=cert_key_filename)
+# START
+if __name__ == "__main__":
+    asyncio.run(main())
