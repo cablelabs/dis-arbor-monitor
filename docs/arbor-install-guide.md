@@ -439,6 +439,13 @@ following:
     notifications per attack – with 1 minute between notifications, the
     following commands can be invoked on the Sightline CLI:
 
+    ```
+    / services sp notification webhooks retry_count_limit enable
+    / services sp notification webhooks retry_count_max set 10
+    / services sp notification webhooks retry_seconds_limit enable
+    / services sp notification webhooks retry_seconds_max 60
+    ```
+
 ## 6. Validation
 
 Confirmation of the invocation of the configured webhook can be performed by
