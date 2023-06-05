@@ -138,7 +138,7 @@ def check_sightline_api_supported():
 def get_src_traffic_report(attack_id):
     # The default for this query is normally 5 source IPs. So need to make sure to over-ride the default limit
     prefix_query_limit=1000000
-    response = requests.get(f"{args.arbor_api_prefix}/api/sp/v6/alerts/{attack_id}/traffic/src_prefixes/"
+    response = requests.get(f"{args.arbor_api_prefix}/api/sp/v10/alerts/{attack_id}/traffic/src_prefixes/"
                             f"?query_unit=bps&query_limit={prefix_query_limit}&query_view=network",
                             verify=not args.arbor_api_insecure,
                             headers={"X-Arbux-APIToken":args.arbor_api_token})
@@ -220,7 +220,7 @@ def add_source_ips_v1(dis_event, attack_id):
     The list of source IPs added
 
     """
-    response = requests.get(f"{args.arbor_api_prefix}/api/sp/v6/alerts/{attack_id}/source_ip_addresses",
+    response = requests.get(f"{args.arbor_api_prefix}/api/sp/v10/alerts/{attack_id}/source_ip_addresses",
                             verify=not args.arbor_api_insecure,
                             headers={"X-Arbux-APIToken":args.arbor_api_token})
     json_response = response.json()

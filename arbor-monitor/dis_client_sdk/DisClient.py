@@ -40,7 +40,8 @@ class DisClient(object):
         self._events = {}
 
     def get_info(self):
-        res = requests.get(f"{self._base_url}/v1/client/me",
+        request_uri = f"{self._base_url}/v1/client/me"
+        res = requests.get(request_uri,
                            params={"api_key": self._key},
                            allow_redirects=True,
                            proxies=self._http_proxies)
@@ -48,7 +49,7 @@ class DisClient(object):
             raise Exception("Not authorized.  Check that your API Key is correct.")
 
         if res.status_code != 200:
-            raise Exception(f"DIS server returned (HTTP Status: {res.status_code} ({res.reason})) accessing {self._base_url} ({res.reason})")
+            raise Exception(f"DIS server returned (HTTP Status: {res.status_code} accessing {request_uri} ({res.reason})")
 
         return res.json()
 
@@ -119,19 +120,21 @@ class DisClient(object):
         for k, v in self._events.items():
             events.append(v)
 
-        res = requests.post("{0}/data?api_key={1}".format(self._base_url, self._key),
-                            json={"events": events}, proxies=self._http_proxies)
+        upload_uri = f"{self._base_url}/v1/data?api_key={self._key}"
+        res = requests.post(upload_uri, json={"events": events}, proxies=self._http_proxies)
 
         if 200 <= res.status_code < 400:
             self._events = {}
-            return f"Sent {len(events)} events to {self._base_url} (HTTP Status: {res.status_code} ({res.reason}))"
+            return f"Sent {len(events)} events to {upload_uri} (HTTP Status: {res.status_code} ({res.reason}))"
 
         if 500 <= res.status_code < 600 or res.status_code == 401:
             # Can be remedied on the server side - throw an error but don't clear the queue
-            raise Exception(f"DIS server returned recoverable server error (HTTP Status: {res.status_code} ({res.reason})) - {len(events)} reports queued") 
+            raise Exception(f"DIS server returned recoverable server error (HTTP Status: "
+                            f"{res.status_code} ({res.reason}) - {len(events)} reports queued")
 
         if 400 <= res.status_code < 500:
             # Not considered recoverable - so clear the queue
             self._events = {}
-            raise Exception(f"DIS server returned client error (HTTP Status: {res.status_code} ({res.reason})")
+            raise Exception(f"DIS server returned client error (HTTP Status: {res.status_code} "
+                            f"uploading to {upload_uri} ({res.reason})")
 
