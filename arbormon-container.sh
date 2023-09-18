@@ -65,6 +65,7 @@ function print_usage()
     echo "     docker-address: Print the IP addresses for the $shortname docker container"
     echo "     docker-env: List the environment variables for the $shortname docker container"
     echo "     docker-shell: Start an interactive shell into the running docker service container"
+    echo "     test-webhook: Perform a test webhook invocation with the given URI"
     echo ""
     echo "   [--docker-image <docker image ID>]"
     echo "       (default \"$DEF_IMAGE_LOCATION\")"
@@ -92,6 +93,8 @@ function print_usage()
     echo "       (default \"$DEF_ARBOR_REST_API_TOKEN\")"
     echo "   [--arbor-api-insecure]"
     echo "       (default \"$DEF_ARBOR_REST_API_INSECURE\")"
+    echo "   [--report-consumer-api-uri <base URI for the DIS backend API>]"
+    echo "       (default \"$DEF_REPORT_API_URI\")"
     echo "   [--report-consumer-api-key <API key for reporting>]"
     echo "       (default \"$DEF_REPORT_API_KEY\")"
     echo "   [--http-proxy <HTTP proxy URL>]"
@@ -112,6 +115,8 @@ function print_usage()
     echo "       (default \"$DEF_REPORT_STORE_DIR\")"
     echo "   [--report-store-format <"only-source-attributes"|"all-attributes">]"
     echo "       (default \"$DEF_REPORT_STORE_FORMAT\")"
+    echo "   [--webhook-test-uri <webhook_uri>]"
+    echo "       (default \"$DEF_WEBHOOK_TEST_URI\")"
 }
 
 function process_arguments()
@@ -131,6 +136,7 @@ function process_arguments()
     arbor_rest_api_prefix="$DEF_ARBOR_REST_API_PREFIX"
     arbor_rest_api_token="$DEF_ARBOR_REST_API_TOKEN"
     arbor_rest_api_insecure="$DEF_ARBOR_REST_API_INSECURE"
+    report_consumer_api_uri="$DEF_REPORT_CONSUMER_API_URI"
     report_consumer_api_key="$DEF_REPORT_CONSUMER_API_KEY"
     report_consumer_http_proxy="$DEF_REPORT_CONSUMER_HTTP_PROXY"
     max_queued_reports="$DEF_MAX_QUEUED_REPORTS"
@@ -144,6 +150,7 @@ function process_arguments()
     report_store_format="$DEF_REPORT_STORE_FORMAT"
     docker_as_user="$DEF_DOCKER_AS_USER"
     docker_as_group="$DEF_DOCKER_AS_GROUP"
+    webhook_test_uri="$DEF_WEBHOOK_TEST_URI"
     debug="$DEF_DEBUG"
 
     while [[ $1 == --* ]]; do
@@ -199,6 +206,10 @@ function process_arguments()
         elif [ "$opt_name" == "--arbor-api-insecure" ]; then
             shift
             arbor_rest_api_insecure="True"
+        elif [ "$opt_name" == "--report-consumer-api-uri" ]; then
+            shift
+            report_consumer_api_uri="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
         elif [ "$opt_name" == "--report-consumer-api-key" ]; then
             shift
             report_consumer_api_key="$1"
@@ -266,6 +277,10 @@ function process_arguments()
             shift
             report_store_format="$1"
             shift || bailout_with_usage "missing parameter to $opt_name"
+        elif [ "$opt_name" == "--webhook-test-uri" ]; then
+            shift
+            webhook_test_uri="$1"
+            shift || bailout_with_usage "missing parameter to $opt_name"
         else
             bailout_with_usage "Unrecognized option: $opt_name"
         fi
@@ -292,6 +307,7 @@ function process_arguments()
         echo "arbor_rest_api_prefix: $arbor_rest_api_prefix"
         echo "arbor_rest_api_token: $arbor_rest_api_token"
         echo "arbor_rest_api_insecure: $arbor_rest_api_insecure"
+        echo "report_consumer_api_uri: $report_consumer_api_uri"
         echo "report_consumer_api_key: $report_consumer_api_key"
         echo "report_consumer_http_proxy: $report_consumer_http_proxy"
         echo "log_report_stats: $log_report_stats"
@@ -302,6 +318,7 @@ function process_arguments()
         echo "report_store_dir: $report_store_dir"
         echo "report_store_format: $report_store_format"
         echo "log_prefix: $log_prefix"
+        echo "webhook_test_uri: $webhook_test_uri"
         echo "debug: $debug"
     fi
 }
@@ -441,6 +458,7 @@ function docker-run()
                               --arbor-api-prefix "$arbor_rest_api_prefix"
                               --arbor-api-token "$arbor_rest_api_token"
                               $arbor_rest_api_insecure_opt
+                              --report-consumer-api-uri "$report_consumer_api_uri"
                               --report-consumer-api-key "$report_consumer_api_key"
                               $report_consumer_http_proxy_opt
                               $log_prefix_opt
@@ -578,6 +596,11 @@ function docker-status()
     $DOCKER_CMD container ps -a --filter name=$container_name
 }
 
+function test-webhook()
+{
+    echo "Invoking test webhook at $webhook_test_uri"
+    curl -v -s -X POST "$webhook_test_uri" -H 'Content-Type: application/json' -d '{"data": {"attributes": {"alert_class": "test","alert_type": "just_a_test"}},"id":"000000"}'
+}
 
 #
 # main logic

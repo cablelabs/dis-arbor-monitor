@@ -101,7 +101,7 @@ async def process_sightline_webhook_notification():
         #  notification (causing potential duplicate reports and backing up Netscout's notify queue)
         return jsonify({"warning": warn_msg}), 200, {'Content-Type': 'application/json'}
     else:
-        return f"Thank you Netscout for the DOS report! (attack ID {attack_id})", 200, {'Content-Type': 'text/plain'}
+        return f"Thank you Netscout for the DDOS report! (attack ID {attack_id})", 200, {'Content-Type': 'text/plain'}
 
 def check_sightline_api_supported():
     """
@@ -425,10 +425,11 @@ arg_parser.add_argument ('--arbor-api-insecure', "-aai", required=False,
                          action='store_true', default=os.environ.get('DIS_ARBORMON_REST_API_INSECURE',False),
                          help="Disable cert checks when invoking Arbor SP API REST calls "
                               "(or DIS_ARBORMON_REST_API_INSECURE)")
-# arg_parser.add_argument ('--report-consumer-url', "-rcu,", required=False, action='store', type=str,
-#                          default = os.environ.get('DIS_ARBORMON_REPORT_CONSUMER_URL'),
-#                          help="Specifies the API prefix to use for submitting attack reports"
-#                               "(or DIS_ARBORMON_REPORT_CONSUMER_URL)")
+arg_default=os.environ.get('DIS_ARBORMON_REPORT_API_URI')
+arg_parser.add_argument ('--report-consumer-api-uri', "-rcuri", required=not arg_default,
+                         action='store', type=str, default=arg_default, metavar="api_uri",
+                         help="Specify the API prefix of the DIS server to submit DIS attack reports to"
+                              "(or DIS_ARBORMON_REPORT_API_URI)")
 arg_default=os.environ.get('DIS_ARBORMON_REPORT_API_KEY')
 arg_parser.add_argument ('--report-consumer-api-key', "-rckey", required=not arg_default,
                          action='store', type=str, default=arg_default, metavar="api_key",
@@ -510,6 +511,7 @@ logger.info(f"Cert chain file: {cert_chain_filename}")
 logger.info(f"Cert key file: {cert_key_filename}")
 logger.info(f"Arbor API prefix: {args.arbor_api_prefix}")
 logger.info(f"Arbor API token: ... ...{args.arbor_api_token[-4:] if args.arbor_api_token else ''}")
+logger.info(f"DIS server API URI: {args.report_consumer_api_uri}")
 logger.info(f"DIS server API key: ... ...{args.report_consumer_api_key[-4:] if args.report_consumer_api_key else ''}")
 logger.info(f"DIS server max queued reports: {args.max_queued_reports}")
 logger.info(f"HTTP Proxy: {args.http_proxy}")
@@ -523,9 +525,8 @@ logger.info(f"Report storage format: {args.report_store_format}")
 if args.dry_run:
     logger.info("RUNNING IN DRY-RUN MODE (not connecting/reporting to the DIS server)")
 else:
-    dis_client = DisClient(api_key=args.report_consumer_api_key, staged_limit=args.max_queued_reports,
-                           http_proxy=args.http_proxy)
-
+    dis_client = DisClient(api_uri=args.report_consumer_api_uri, api_key=args.report_consumer_api_key,
+                           staged_limit=args.max_queued_reports, http_proxy=args.http_proxy)
     try:
         dis_client_info = dis_client.get_info()
         logger.info(f"DIS client name: {dis_client_info.get('name')}")
