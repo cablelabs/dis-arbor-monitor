@@ -60,6 +60,7 @@ function print_usage()
     echo "     docker-restart: Restart the $shortname docker container (with the original params)"
     echo "     docker-update: Kill & remove the container, update image from repo, and start container"
     echo "     docker-logs: Show the logs for $shortname docker container"
+    echo "     docker-save-logs: Save the logs for $shortname docker container to a compressed log file"
     echo "     docker-relaunch: Remove the container and restart (do this after changing params/conf file)"
     echo "     docker-trace: Watch the logs for the $shortname docker container"
     echo "     docker-address: Print the IP addresses for the $shortname docker container"
@@ -548,6 +549,15 @@ function docker-logs()
 {
     echo "Showing logs for container \"$container_name\""
     $DOCKER_CMD container logs --timestamps $container_name 2>&1 | less
+}
+
+function docker-save-logs()
+{
+    logfile=dis-arbormon-log.$(date +"%Y-%m-%d-%H%M").txt
+    echo "Saving logs for container \"$container_name\" to $logfile..."
+    if $DOCKER_CMD container logs --timestamps $container_name 2>&1 | gzip > "$logfile.gz"; then
+        echo "Saved logs to $logfile.gz"
+    fi
 }
 
 function docker-trace()
