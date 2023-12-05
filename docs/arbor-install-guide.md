@@ -1,6 +1,6 @@
 # Installation Guide for the DDoS Info Sharing (DIS) Netscout Arbor Sightline Monitor/Client
 
-### v 0.5
+### v 0.6
 
 ## 1. Introduction
 
@@ -16,7 +16,7 @@ Monitor/Client for Sightline 9.x systems.
 
 ## 2. Create an API key for the Monitor/Client
 
-Using the provided credentials, go to <https://dissarm.net/clients> and select
+Using the provided credentials, go to <https://dis-server-address/clients> and select
 "Provision New Client."
 
 NOTE: If you don’t already have credentials for the DIS management system,
@@ -42,7 +42,7 @@ access to the Arbor Sightline CLI. This is described in the "Enabling Customers
 to View Sightline Data in the Web Services API" section of the *Sightline and
 Threat Mitigation System User Guide*.
 
-From the Netscout CLI, enter the following command:
+From the NetScout CLI, enter the following command:
 
 ```
 / services aaa local apitoken generate user_name "token_description"
@@ -57,6 +57,35 @@ If an API token exists (or if you’re not sure one exists), use:
 To show any active API tokens. Make note of the Arbor REST API token for the
 steps below.
 
+To test the token and accessibility to the NetScout Sightline API, run the following on the host intended to run the DIS Client:
+
+    ```
+    cat > arbux-api-token-header.txt
+    X-Arbux-APIToken: <api token string>
+    ```
+
+storing it in a file is preferable to putting the token in a CLI command, which could cause the token to get stored in your command history. 
+Then to try querying the NetScout SP API, use a command of the form:
+
+    ```
+    curl --location -H @arbux-api-token-header.txt https://sightline-host-address/api/sp
+    ```
+
+Note: add the "--insecure" flag to this command if the site doesn't have a verifyable web certificate.
+
+Upon successful invocation, this endpoint should return a list of other available endpoints and some version information in a blovk like this:
+
+```json
+{
+  "meta": {
+    "api": "SP",
+    "api_version": "9",
+    "sp_build_id": "LIAK",
+    "sp_version": "9.4.0.1"
+  }
+}
+```
+
 ## 4. Install the DDoS Info Sharing (DIS) Monitor/Client (v2)
 
 The DIS Arbor Monitor/Client requires the following:
@@ -69,8 +98,8 @@ The DIS Arbor Monitor/Client requires the following:
         validate the server (when configuring the client to access the SP API
         using https)
 
-    -   Optionally, a root certificate that allows for validation of SP webhook
-        calls (when configuring SP with https-based webhooks)
+    -   Optionally, a root certificate chain that allows for validation of SP 
+        webhook calls (when configuring SP with https-based webhooks)
 
 -   A server to host the Monitor/Client with:
 
@@ -79,8 +108,7 @@ The DIS Arbor Monitor/Client requires the following:
     -   Support for incoming TCP connections established from Arbor Netscout
         (http or https)
 
-    -   Access to the Arbor Netscout REST API (e.g.
-        http://arbor-hostname-or-ip/)
+    -   Access to the Arbor Netscout REST API (e.g. http://arbor-hostname-or-ip/)
 
     -   A network connection allowing outbound HTTPS connections (specifically
         to <https://dissarm.net/>)
