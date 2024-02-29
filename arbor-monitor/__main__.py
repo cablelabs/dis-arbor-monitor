@@ -55,6 +55,11 @@ async def process_sightline_webhook_notification():
 
     attack_subobjects = attack_attributes["subobject"]
 
+    destination_ip = attack_subobjects['host_address']
+    if destination_ip in args.ignore_destinations:
+        logger.info(f"Ignoring alert {attack_id}. Destination {destination_ip} is in ignore list.")
+        return "Ignoring due to destination IP", 200, {'Content-Type': 'text/plain'}
+
     start_time = attack_attributes.get("start_time")
     stop_time = attack_attributes.get("stop_time")
     misuse_types = attack_subobjects.get("misuse_types")
@@ -489,6 +494,10 @@ arg_parser.add_argument ('--report-store-format', "-repf", required=False, actio
                          default=os.environ.get('DIS_ARBORMON_REPORT_STORE_FORMAT', "only-source-attributes"),
                          help="Specify the report format to use when writing reports "
                               f"(or DIS_ARBORMON_REPORT_STORE_FORMAT). One of {storage_format_choices}")
+arg_parser.add_argument('--ignore-destinations', required=False, nargs='+',
+                        default=os.environ.get('DIS_ARBORMON_IGNORE_DESTINATIONS', []),
+                        help="Specify space-separated list of DOS destination IPs to ignore. "
+                        " (or DIS_ARBORMON_IGNORE_DESTINATIONS)")
 
 args = arg_parser.parse_args()
 
@@ -521,6 +530,7 @@ logger.info(f"Syslog TCP server: {args.syslog_tcp_server}")
 logger.info(f"Syslog socket: {args.syslog_socket}")
 logger.info(f"Report storage directory: {args.report_store_dir}")
 logger.info(f"Report storage format: {args.report_store_format}")
+logger.info(f"Ignore DOS destinations list: {args.ignore_destinations}")
 
 if args.dry_run:
     logger.info("RUNNING IN DRY-RUN MODE (not connecting/reporting to the DIS server)")
