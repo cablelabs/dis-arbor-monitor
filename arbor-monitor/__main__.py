@@ -495,7 +495,7 @@ arg_parser.add_argument ('--report-store-format', "-repf", required=False, actio
                          help="Specify the report format to use when writing reports "
                               f"(or DIS_ARBORMON_REPORT_STORE_FORMAT). One of {storage_format_choices}")
 arg_parser.add_argument('--ignore-destinations', required=False, nargs='+',
-                        default=os.environ.get('DIS_ARBORMON_IGNORE_DESTINATIONS', []),
+                        default=str.split(os.environ.get('DIS_ARBORMON_IGNORE_DESTINATIONS', "")),
                         help="Specify space-separated list of DOS destination IPs to ignore. "
                         " (or DIS_ARBORMON_IGNORE_DESTINATIONS)")
 
