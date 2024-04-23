@@ -1,8 +1,9 @@
 from quart import Quart,request, jsonify
 import json, requests, logging, logging.handlers, socket, asyncio, os, argparse, dateutil.parser, time, setproctitle
-from ipaddress import IPv4Address, IPv4Network, IPv6Network, ip_network
+from ipaddress import IPv4Address, IPv4Network, IPv6Network, ip_network, ip_address
 from dis_client_sdk import DisClient
 from pathlib import Path
+from typing import List, Union
 
 #disable Warning for SSL.
 requests.packages.urllib3.disable_warnings()
@@ -54,6 +55,11 @@ async def process_sightline_webhook_notification():
     logger.info(f"Processing notification of COMPLETED DOS attack (Attack ID: {attack_id})")
 
     attack_subobjects = attack_attributes["subobject"]
+
+    destination_ip = ip_address(attack_subobjects['host_address'])
+    if any([destination_ip in network for network in args.ignore_destinations]):
+        logger.info(f"Ignoring alert {attack_id}. Destination {destination_ip} is in ignore list.")
+        return "Ignoring due to destination IP", 200, {'Content-Type': 'text/plain'}
 
     start_time = attack_attributes.get("start_time")
     stop_time = attack_attributes.get("stop_time")
@@ -376,6 +382,20 @@ async def perform_periodic_status_reports(report_interval_mins):
 
 # MAIN
 
+
+def get_list_of_networks(data: str) -> List[Union[IPv4Network, IPv6Network]]:
+    """
+    Split sting of IP networks to a list of IP Network Objects
+    >>> assert [IPv4Network('10.0.0.0/24'), IPv6Network('2001:db8::/64')] == get_list_of_networks('10.0.0.0/24 2001:db8::/64')
+    >>> assert [] == get_list_of_networks('')
+    :param data:
+    :return:
+    """
+    if not data:
+        return []
+    return [ip_network(net) for net in data.split(' ')]
+
+
 arg_parser = argparse.ArgumentParser(description='Monitors for Arbor attack events and posts source address reports "'
                                                  'to the specified event consumer')
 
@@ -489,6 +509,10 @@ arg_parser.add_argument ('--report-store-format', "-repf", required=False, actio
                          default=os.environ.get('DIS_ARBORMON_REPORT_STORE_FORMAT', "only-source-attributes"),
                          help="Specify the report format to use when writing reports "
                               f"(or DIS_ARBORMON_REPORT_STORE_FORMAT). One of {storage_format_choices}")
+arg_parser.add_argument('--ignore-destinations', required=False, nargs='+', type=ip_network,
+                        default=get_list_of_networks(os.environ.get('DIS_ARBORMON_IGNORE_DESTINATIONS')),
+                        help="Specify space-separated list of DOS destination IPs to ignore. "
+                        " (or DIS_ARBORMON_IGNORE_DESTINATIONS)")
 
 args = arg_parser.parse_args()
 
@@ -521,6 +545,7 @@ logger.info(f"Syslog TCP server: {args.syslog_tcp_server}")
 logger.info(f"Syslog socket: {args.syslog_socket}")
 logger.info(f"Report storage directory: {args.report_store_dir}")
 logger.info(f"Report storage format: {args.report_store_format}")
+logger.info(f"Ignore DOS destinations list: {args.ignore_destinations}")
 
 if args.dry_run:
     logger.info("RUNNING IN DRY-RUN MODE (not connecting/reporting to the DIS server)")

@@ -1,6 +1,6 @@
 # Installation Guide for the DDoS Info Sharing (DIS) Netscout Arbor Sightline Monitor/Client
 
-### v 0.5
+### v 0.6
 
 ## 1. Introduction
 
@@ -16,7 +16,7 @@ Monitor/Client for Sightline 9.x systems.
 
 ## 2. Create an API key for the Monitor/Client
 
-Using the provided credentials, go to <https://dissarm.net/clients> and select
+Using the provided credentials, go to <https://<dis-server>/clients> and select
 "Provision New Client."
 
 NOTE: If you don’t already have credentials for the DIS management system,
@@ -83,7 +83,7 @@ The DIS Arbor Monitor/Client requires the following:
         http://arbor-hostname-or-ip/)
 
     -   A network connection allowing outbound HTTPS connections (specifically
-        to <https://dissarm.net/>)
+        to <https://<dis_site/>)
 
     -   Optionally, a https server certificate that the Sightline 9.x system can
         use to validate the server (when configuring Sightline webhooks using
