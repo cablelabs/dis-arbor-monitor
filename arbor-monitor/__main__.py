@@ -11,6 +11,20 @@ requests.packages.urllib3.disable_warnings()
 default_log_prefix = "dis-arbor-sl-monitor"
 
 app = Quart(__name__)
+app.config['app_start_timestamp'] = time.time()
+
+@app.route('/health', methods=['GET'])
+async def stats():
+    """
+    Return basic information about running application.
+    :return: JSON with health status
+    """
+    uptime: int = round(time.time() - app.config['app_start_timestamp'])
+    return jsonify({"total_reports_sent": total_reports_sent,
+                    "total_source_ips_reported": total_source_ips_reported,
+                    "uptime_sec": uptime
+                    })
+
 
 @app.route('/dis/sl-webhook',methods=['POST'])
 async def process_sightline_webhook_notification():
